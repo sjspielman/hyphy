@@ -244,7 +244,7 @@ function pogofit.fitGTR (current_results) {
 /********************************************************************************************************************/
 
 function pogofit.save_options() {
-    pogofit.analysis_results[utility.getGlobalValue("terms.json.options")] = {utility.getGlobalValue("pogofit.options.frequency_type"): pogofit.frequency,
+    pogofit.analysis_results[utility.getGlobalValue("terms.json.options")] = {utility.getGlobalValue("pogofit.options.frequency_type"): pogofit.frequency_type,
                                                                                   utility.getGlobalValue("pogofit.options.baseline_model"): pogofit.baseline_model};
 
     pogofit.analysis_results[utility.getGlobalValue("terms.json.input")] = {utility.getGlobalValue("terms.json.file"): pogofit.input_file,

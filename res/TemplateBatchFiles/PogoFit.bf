@@ -80,6 +80,9 @@ if (pogofit.one_or_many == pogofit.multiple)
     pogofit.input_file  = utility.getGlobalValue("LAST_FILE_PATH");
 }
 
+//console.log(pogofit.input_file);
+//console.log(pogofit.file_list);
+
 pogofit.output_model_prefix = pogofit.input_file;
 pogofit.json_file           = pogofit.input_file  + ".POGOFIT.json";
 pogofit.file_list           = io.validate_a_list_of_files (pogofit.file_list);
@@ -115,7 +118,6 @@ if (pogofit.frequency_type == pogofit.emp_freq){
 if (pogofit.frequency_type == pogofit.ml_freq){
     pogofit.rev_model = "models.protein.REVML.ModelDescription.withGamma";
 }
-
 
 
 /********************************************************************************************************************/
