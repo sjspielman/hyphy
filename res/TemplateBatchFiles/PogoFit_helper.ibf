@@ -192,7 +192,7 @@ function pogofit.fitGTR (current_results) {
         (initial_values[terms.branch_length])[file_index] = ((current_results[file_index])[terms.branch_length])[0];
     }
 
-    //utility.SetEnvVariable ("VERBOSITY_LEVEL", 1);
+    utility.SetEnvVariable ("VERBOSITY_LEVEL", 1);
     utility.ToggleEnvVariable ("AUTO_PARALLELIZE_OPTIMIZE", 1);
     utility.ToggleEnvVariable ("OPTIMIZATION_METHOD", 0);
 

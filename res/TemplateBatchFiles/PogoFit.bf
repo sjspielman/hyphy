@@ -15,21 +15,19 @@ LoadFunctionLibrary("libv3/models/rate_variation.bf");
 LoadFunctionLibrary("libv3/models/protein/empirical.bf");
 LoadFunctionLibrary("libv3/models/protein/REV.bf");
 LoadFunctionLibrary("libv3/models/protein.bf");
-LoadFunctionLibrary("PogoFit_helper.ibf"); // Functions, model definitions used for this batchfile.
+LoadFunctionLibrary("PogoFit_helper.ibf"); //_RMSE.ibf"); // Functions, model definitions used for this batchfile.
 
 
 /*------------------------------------------------------------------------------*/
 
 utility.ToggleEnvVariable ("NORMALIZE_SEQUENCE_NAMES", 1);
-//utility.ToggleEnvVariable ("PRODUCE_OPTIMIZATION_LOG", 1); 
-//utility.ToggleEnvVariable ("OPTIMIZATION_PRECISION", 0.1);
 
 pogofit.analysis_banner = {
     terms.io.info: "PogoFit, *P*rotein *G*TR *Fit*ter: Fit a general time reversible (GTR) model to a collection of training protein sequence alignments.",
     terms.io.version: "0.01",
     terms.io.reference: "TBD",
     terms.io.authors: "Sergei L Kosakovsky Pond and Stephanie J Spielman",
-    terms.io.contact: "{spond,stephanie.spielman}@temple.edu",
+    terms.io.contact: "spond@temple.edu; spielman@rowan.edu",
     terms.io.requirements: "All alignments must be in HyPhy-format: Each file must contain a protein multiple sequence alignment and newick phylogeny. NEXUS input is not accepted."
 };
 io.DisplayAnalysisBanner(pogofit.analysis_banner);
@@ -80,14 +78,14 @@ if (pogofit.one_or_many == pogofit.multiple)
     pogofit.input_file  = utility.getGlobalValue("LAST_FILE_PATH");
 }
 
-//console.log(pogofit.input_file);
-//console.log(pogofit.file_list);
 
 pogofit.output_model_prefix = pogofit.input_file;
 pogofit.json_file           = pogofit.input_file  + ".POGOFIT.json";
 pogofit.file_list           = io.validate_a_list_of_files (pogofit.file_list);
 pogofit.file_list_count     = Abs (pogofit.file_list);
 pogofit.index_to_filename   = utility.SwapKeysAndValues(pogofit.file_list);
+
+
 
 // Prompt for baseline AA model //
 pogofit.baseline_model  = io.SelectAnOption (models.protein.empirical_models,
