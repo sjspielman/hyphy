@@ -15,12 +15,15 @@ LoadFunctionLibrary("libv3/models/rate_variation.bf");
 LoadFunctionLibrary("libv3/models/protein/empirical.bf");
 LoadFunctionLibrary("libv3/models/protein/REV.bf");
 LoadFunctionLibrary("libv3/models/protein.bf");
-LoadFunctionLibrary("PogoFit_helper.ibf"); //_RMSE.ibf"); // Functions, model definitions used for this batchfile.
+LoadFunctionLibrary("PogoFit_helper_RMSE.ibf"); // Functions, model definitions used for this batchfile.
 
 
 /*------------------------------------------------------------------------------*/
 
 utility.ToggleEnvVariable ("NORMALIZE_SEQUENCE_NAMES", 1);
+//utility.SetEnvVariable    ("OPTIMIZATION_PRECISION", 0.001);
+pogofit.rmse_precision = 0.001;
+
 
 pogofit.analysis_banner = {
     terms.io.info: "PogoFit, *P*rotein *G*TR *Fit*ter: Fit a general time reversible (GTR) model to a collection of training protein sequence alignments.",

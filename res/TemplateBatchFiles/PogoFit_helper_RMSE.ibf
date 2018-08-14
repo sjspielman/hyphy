@@ -238,7 +238,7 @@ function pogofit.fitGTR (current_results) {
 
     pogofit.fit_options - terms.run_options.proportional_branch_length_scaler;
 
-    utility.SetEnvVariable      ("OPTIMIZATION_PRECISION", 0.1);
+    //utility.SetEnvVariable      ("OPTIMIZATION_PRECISION", 0.1);
 
     utility.ForEachPair ( pogofit.rev_mle [terms.global], "_name_", "_value_",
     '
@@ -254,7 +254,7 @@ function pogofit.fitGTR (current_results) {
                                         pogofit.fit_options
                                    );
 
-    utility.SetEnvVariable      ("OPTIMIZATION_PRECISION", 0.001);
+    //utility.SetEnvVariable      ("OPTIMIZATION_PRECISION", 0.001);
 
     utility.ForEachPair ( pogofit.rev_mle [terms.global], "_name_", "_value_",
     '
@@ -281,7 +281,7 @@ function pogofit.fitGTR (current_results) {
     utility.SetEnvVariable      ("VERBOSITY_LEVEL", 0);
     utility.ToggleEnvVariable   ("AUTO_PARALLELIZE_OPTIMIZE", 1);
     utility.ToggleEnvVariable   ("OPTIMIZATION_METHOD", 0);
-    utility.SetEnvVariable      ("OPTIMIZATION_PRECISION", 0.5);
+    utility.SetEnvVariable      ("OPTIMIZATION_PRECISION", pogofit.rmse_precision);
     //utility.SetEnvVariable      ("USE_LAST_RESULTS", TRUE);
     utility.SetEnvVariable      ("LF_CONVERGENCE_CRITERION", "pogofit.rms_error");
 
@@ -296,10 +296,6 @@ function pogofit.fitGTR (current_results) {
     
     pogofit.rev_mle = estimators.ExtractMLEs( "pogofit.lf.likelihoodFunction", pogofit.model_id_to_object);
     pogofit.rev_mle [utility.getGlobalValue("terms.fit.log_likelihood")] = mles[1][0]; // keep logl in jsonss
-    ExecuteCommands("GetString (pogofit.lfInfo, `pogofit.lf.likelihoodFunction`,-1)");
-    console.log("");
-    console.log(pogofit.lfInfo);
-    console.log("");
     
     /*
     // Uncomment these lines if you'd like to save the NEXUS LF.
