@@ -97,7 +97,7 @@ pogofit.index_to_filename   = utility.SwapKeysAndValues(pogofit.file_list);
 // Set RMSE precision based on number of datasets
 if ( pogofit.file_list_count <= 10 ) 
 {
-    pogofit.rmse_precision = 0.1;
+    pogofit.rmse_precision = 0.05;
 }
 else
 {
