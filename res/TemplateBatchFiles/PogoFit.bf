@@ -94,14 +94,22 @@ pogofit.file_list           = io.validate_a_list_of_files (pogofit.file_list);
 pogofit.file_list_count     = Abs (pogofit.file_list);
 pogofit.index_to_filename   = utility.SwapKeysAndValues(pogofit.file_list);
 
-// Set RMSE precision based on number of datasets.. MAYBE?
-if ( pogofit.file_list_count <= 25 ) {
-    pogofit.rmse_precision = 0.01;
+// Set RMSE precision based on number of datasets
+if ( pogofit.file_list_count <= 10 ) 
+{
+    pogofit.rmse_precision = 0.1;
 }
-else{
-    pogofit.rmse_precision = 0.001;
+else
+{
+    if ( pogofit.file_list_count <= 25  ) 
+    {
+        pogofit.rmse_precision = 0.01;
+    }
+    else
+    {
+        pogofit.rmse_precision = 0.001;
+    }
 }    
-pogofit.rmse_precision = 1.0;
 
 // Prompt for baseline AA model //
 pogofit.baseline_model  = io.SelectAnOption (models.protein.empirical_models,
