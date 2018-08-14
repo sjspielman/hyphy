@@ -21,9 +21,6 @@ LoadFunctionLibrary("PogoFit_helper_RMSE.ibf"); // Functions, model definitions 
 /*------------------------------------------------------------------------------*/
 
 utility.ToggleEnvVariable ("NORMALIZE_SEQUENCE_NAMES", 1);
-//utility.SetEnvVariable    ("OPTIMIZATION_PRECISION", 0.001);
-pogofit.rmse_precision = 0.001;
-
 
 pogofit.analysis_banner = {
     terms.io.info: "PogoFit, *P*rotein *G*TR *Fit*ter: Fit a general time reversible (GTR) model to a collection of training protein sequence alignments.",
@@ -38,14 +35,23 @@ io.DisplayAnalysisBanner(pogofit.analysis_banner);
 pogofit.baseline_phase   = "Baseline Fit";
 pogofit.final_phase      = "GTR Fit";
 
+pogofit.options.rmse_precision = "RMSE Precision";
+pogofit.options.imputation = "Impute zero rates";
+pogofit.options.dataset_information = "Dataset information";
+pogofit.options.number_of_datasets = "Number of datasets";
 pogofit.options.frequency_type = "frequency estimation";
+pogofit.options.baseline_model   = "baseline model";
+
+
 pogofit.ml_freq                = "ML";
 pogofit.emp_freq               = "Emp";
 
 pogofit.single   = "Single";
 pogofit.multiple = "Multiple";
 
-pogofit.options.baseline_model   = "baseline model";
+pogofit.impute = "Yes";
+pogofit.no_impute = "No";
+
 
 pogofit.output_hyphy    = "HyPhy";
 pogofit.output_paml     = "PAML";
@@ -88,7 +94,14 @@ pogofit.file_list           = io.validate_a_list_of_files (pogofit.file_list);
 pogofit.file_list_count     = Abs (pogofit.file_list);
 pogofit.index_to_filename   = utility.SwapKeysAndValues(pogofit.file_list);
 
-
+// Set RMSE precision based on number of datasets.. MAYBE?
+if ( pogofit.file_list_count <= 25 ) {
+    pogofit.rmse_precision = 0.01;
+}
+else{
+    pogofit.rmse_precision = 0.001;
+}    
+pogofit.rmse_precision = 1.0;
 
 // Prompt for baseline AA model //
 pogofit.baseline_model  = io.SelectAnOption (models.protein.empirical_models,
@@ -105,6 +118,14 @@ pogofit.output_format  = io.SelectAnOption ({
                                                   {pogofit.output_raxml, "RAXML-formatted model (extension `.raxml`)"},
                                                   {pogofit.output_all, "Output all file formats"}},
                                                  "Select an output format for the fitted model:");
+
+// Prompt for zero-rate imputation //
+pogofit.imputation  = io.SelectAnOption ({{pogofit.impute, "Impute zero rates as in Nickle et al. 2007 (Recommended)"},
+                                          {pogofit.no_impute, "Leave zero rates at zero"}},
+                                           "Impute zero rates for final model files (*excluding* JSON)?:");
+
+pogofit.imputation = pogofit.impute;
+
 pogofit.use_rate_variation = "Gamma"; 
 
 pogofit.save_options();
@@ -167,15 +188,11 @@ for (file_index = 0; file_index < pogofit.file_list_count; file_index += 1) {
 
      io.ReportProgressMessageMD ("Protein GTR Fitter", " * Initial branch length fit",
                                      "Dispatching file '" + pogofit.file_list[file_index]);
-    mpi.QueueJob (pogofit.queue, "pogofit.fitBaselineToFile", {"0" : pogofit.file_list[file_index]},
+     mpi.QueueJob (pogofit.queue, "pogofit.fitBaselineToFile", {"0" : pogofit.file_list[file_index]},
                                                             "pogofit.handle_baseline_callback");
 }
 mpi.QueueComplete (pogofit.queue);
 pogofit.stopTimer (pogofit.timers, pogofit.baseline_phase);
-
-pogofit.baseline_fit_logL = math.Sum (utility.Map (utility.Filter (pogofit.analysis_results, "_value_", "_value_/pogofit.baseline_phase"), "_value_", "(_value_[pogofit.baseline_phase])[terms.fit.log_likelihood]"));
-io.ReportProgressMessageMD ("Protein GTR Fitter", " * Initial branch length fit",
-                            "Overall Log(L) = " + pogofit.baseline_fit_logL);
 /*************************************************************************************************************/
 /*************************************************************************************************************/
 
@@ -189,7 +206,8 @@ console.log("\n\n[PHASE 2] Optimizing protein model");
 
 pogofit.startTimer (pogofit.timers, pogofit.final_phase);
 
-pogofit.baseline_fit = utility.Map (utility.Filter (pogofit.analysis_results, "_value_", "_value_/'" + pogofit.baseline_phase + "'"), "_value_", "_value_['" + pogofit.baseline_phase + "']");
+//pogofit.baseline_fit = utility.Map (utility.Filter (pogofit.analysis_results, "_value_", "_value_/'" + pogofit.baseline_phase + "'"), "_value_", "_value_['" + pogofit.baseline_phase + "']");
+pogofit.baseline_fit = pogofit.analysis_results[pogofit.baseline_phase];
 pogofit.gtr_fit = pogofit.fitGTR(pogofit.baseline_fit);
                                                                                                                               
 pogofit.stopTimer (pogofit.timers, pogofit.final_phase);
@@ -199,10 +217,40 @@ pogofit.stopTimer (pogofit.timers, pogofit.final_phase);
 
 
 /*********************** Save custom model to file(s) as specified **************************/
-pogofit.final_rij = pogofit.extract_rates();
-pogofit.final_efv = pogofit.extract_efv();
-pogofit.write_model_to_file();
+pogofit.final_efv = pogofit.extract_efv(); // fitted frequencies
 
+if (pogofit.imputation == pogofit.impute) 
+{
+    // Tree length for each alignment
+    pogofit.tree_lengths = {};
+    utility.ForEachPair (pogofit.gtr_fit[terms.branch_length], "_part_", "_value_",
+    '
+        pogofit.tree_lengths[_part_] = math.Sum(utility.Map (_value_, "_data_",
+        "
+            _data_ [terms.fit.MLE]
+        " 
+        ))
+    '
+    );
+
+
+    // Site counts for each alignment
+    pogofit.site_counts = {};
+
+    utility.ForEachPair( (pogofit.analysis_results[terms.json.input])[pogofit.options.dataset_information], "_key_", "_value_",
+    '
+        pogofit.site_counts[_key_] = _value_[terms.json.sites]
+    '
+    );
+
+    pogofit.final_rij = pogofit.extract_rates_imputation();
+}
+else 
+{
+    pogofit.final_rij = pogofit.extract_rates();
+}
+console.log(pogofit.final_rij);
+pogofit.write_model_to_file();
 
 /************************************* Save analysis JSON ***********************************/
 pogofit.stopTimer (pogofit.timers, "Total time");
