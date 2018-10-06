@@ -15,10 +15,14 @@ LoadFunctionLibrary("libv3/models/rate_variation.bf");
 LoadFunctionLibrary("libv3/models/protein/empirical.bf");
 LoadFunctionLibrary("libv3/models/protein/REV.bf");
 LoadFunctionLibrary("libv3/models/protein.bf");
-LoadFunctionLibrary("PogoFit_helper_RMSE.ibf"); // Functions, model definitions used for this batchfile.
+LoadFunctionLibrary("PogoFit_helper.ibf"); // Functions, model definitions used for this batchfile.
 
 
 /*------------------------------------------------------------------------------*/
+
+
+
+//utility.ToggleEnvVariable ("OPTIMIZATION_PRECISION", 0.9); // TESTING
 
 utility.ToggleEnvVariable ("NORMALIZE_SEQUENCE_NAMES", 1);
 
@@ -35,7 +39,6 @@ io.DisplayAnalysisBanner(pogofit.analysis_banner);
 pogofit.baseline_phase   = "Baseline Fit";
 pogofit.final_phase      = "GTR Fit";
 
-pogofit.options.rmse_precision = "RMSE Precision";
 pogofit.options.imputation = "Impute zero rates";
 pogofit.options.dataset_information = "Dataset information";
 pogofit.options.number_of_datasets = "Number of datasets";
@@ -94,24 +97,14 @@ pogofit.file_list           = io.validate_a_list_of_files (pogofit.file_list);
 pogofit.file_list_count     = Abs (pogofit.file_list);
 pogofit.index_to_filename   = utility.SwapKeysAndValues(pogofit.file_list);
 
-// Set RMSE precision based on number of datasets
-if ( pogofit.file_list_count <= 10 ) 
-{
-    pogofit.rmse_precision = 0.05;
-}
-else
-{
-    if ( pogofit.file_list_count <= 25  ) 
-    {
-        pogofit.rmse_precision = 0.01;
-    }
-    else
-    {
-        pogofit.rmse_precision = 0.001;
-    }
-}    
 
-// Prompt for baseline AA model //
+// For testing, set to defaults:
+pogofit.baseline_model = "JTT";
+pogofit.frequency_type = pogofit.emp_freq;
+pogofit.output_format = pogofit.output_all;
+pogofit.imputation = pogofit.impute;
+
+/*
 pogofit.baseline_model  = io.SelectAnOption (models.protein.empirical_models,
                                                 "Select an empirical protein model to use for optimizing the provided branch lengths:");
 
@@ -131,8 +124,9 @@ pogofit.output_format  = io.SelectAnOption ({
 pogofit.imputation  = io.SelectAnOption ({{pogofit.impute, "Impute zero rates as in Nickle et al. 2007 (Recommended)"},
                                           {pogofit.no_impute, "Leave zero rates at zero"}},
                                            "Impute zero rates for final model files (*excluding* JSON)?:");
+*/
 
-pogofit.imputation = pogofit.impute;
+
 
 pogofit.use_rate_variation = "Gamma"; 
 
@@ -214,12 +208,10 @@ console.log("\n\n[PHASE 2] Optimizing protein model");
 
 pogofit.startTimer (pogofit.timers, pogofit.final_phase);
 
-//pogofit.baseline_fit = utility.Map (utility.Filter (pogofit.analysis_results, "_value_", "_value_/'" + pogofit.baseline_phase + "'"), "_value_", "_value_['" + pogofit.baseline_phase + "']");
-pogofit.baseline_fit = pogofit.analysis_results[pogofit.baseline_phase];
+pogofit.baseline_fit = utility.Map (utility.Filter (pogofit.analysis_results, "_value_", "_value_/'" + pogofit.baseline_phase + "'"), "_value_", "_value_['" + pogofit.baseline_phase + "']");
 pogofit.gtr_fit = pogofit.fitGTR(pogofit.baseline_fit);
                                                                                                                               
-pogofit.stopTimer (pogofit.timers, pogofit.final_phase);
-/*************************************************************************************************************/
+pogofit.stopTimer (pogofit.timers, pogofit.final_phase);/*************************************************************************************************************/
 /*************************************************************************************************************/
 
 
@@ -244,20 +236,19 @@ if (pogofit.imputation == pogofit.impute)
 
     // Site counts for each alignment
     pogofit.site_counts = {};
-
+    //console.log(pogofit.analysis_results);
+    //exit();
     utility.ForEachPair( (pogofit.analysis_results[terms.json.input])[pogofit.options.dataset_information], "_key_", "_value_",
     '
-        pogofit.site_counts[_key_] = _value_[terms.json.sites]
+        pogofit.site_counts[_key_] = _value_[terms.json.sites];
     '
     );
-
     pogofit.final_rij = pogofit.extract_rates_imputation();
 }
 else 
 {
     pogofit.final_rij = pogofit.extract_rates();
 }
-console.log(pogofit.final_rij);
 pogofit.write_model_to_file();
 
 /************************************* Save analysis JSON ***********************************/

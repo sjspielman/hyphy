@@ -245,10 +245,13 @@ function pogofit.fitGTR (current_results) {
 
 function pogofit.save_options() {
     pogofit.analysis_results[utility.getGlobalValue("terms.json.options")] = {utility.getGlobalValue("pogofit.options.frequency_type"): pogofit.frequency_type,
-                                                                                  utility.getGlobalValue("pogofit.options.baseline_model"): pogofit.baseline_model};
+                                                                              utility.getGlobalValue("pogofit.options.baseline_model"): pogofit.baseline_model,
+                                                                              utility.getGlobalValue("pogofit.options.imputation"): pogofit.imputation};
 
     pogofit.analysis_results[utility.getGlobalValue("terms.json.input")] = {utility.getGlobalValue("terms.json.file"): pogofit.input_file,
-                                                                                "number of datasets": pogofit.file_list_count};
+                                                                            pogofit.options.number_of_datasets: pogofit.file_list_count,
+                                                                            pogofit.options.dataset_information: {}};
+
 
     /* Temporarily, we save input file information here in a highly redundant fashion, but doesn't seem possible to do in MPI...? */
     for (file_index = 0; file_index < pogofit.file_list_count; file_index += 1) {
@@ -290,12 +293,12 @@ function pogofit.save_options() {
         }
         utility.ForEach (utility.Keys (pogofit.name_mapping), "branch_name",
                                  "utility.EnsureKey (pogofit.output_data_info[terms.original_name], branch_name)");
-        
+
         utility.ForEach (utility.Keys (pogofit.name_mapping), "branch_name",
                                  "(pogofit.output_data_info[terms.original_name])[branch_name] = pogofit.name_mapping[branch_name]");
-        
-        
-        (pogofit.analysis_results[file_index])[utility.getGlobalValue("terms.json.input")] = pogofit.output_data_info;   
+
+
+        ((pogofit.analysis_results[terms.json.input])[pogofit.options.dataset_information])[file_index] = pogofit.output_data_info;
     }
 }
 
@@ -361,12 +364,15 @@ function pogofit.extract_rates_imputation() {
 
 
     pogofit.thekeys =  utility.Keys(pogofit.site_counts);
+    console.log(pogofit.thekeys);
     summation = 0.0;
     for (x = 0; x < utility.Array1D(pogofit.thekeys); x+=1)
     {
         this_key = pogofit.thekeys[x];
         summation += ((1. + pogofit.site_counts[this_key]) * pogofit.tree_lengths[this_key] );            
     }
+    console.log(summation);
+    
     
     rij = {};
     for (l1 = 0; l1 < 20 - 1; l1 += 1) {
