@@ -356,6 +356,38 @@ function pogofit.extract_rates() {
 }
 
 
+// From the fitted model results and create rate dictionary which can be used for .fitted_model
+function pogofit.extract_rates_imputation() {
+
+
+    pogofit.thekeys =  utility.Keys(pogofit.site_counts);
+    summation = 0.0;
+    for (x = 0; x < utility.Array1D(pogofit.thekeys); x+=1)
+    {
+        this_key = pogofit.thekeys[x];
+        summation += ((1. + pogofit.site_counts[this_key]) * pogofit.tree_lengths[this_key] );            
+    }
+    
+    rij = {};
+    for (l1 = 0; l1 < 20 - 1; l1 += 1) {
+        rij[models.protein.alphabet[l1]] = {};
+        for (l2 = l1 + 1; l2 < 20; l2 += 1) {
+            rate_search = terms.aminoacidRate(models.protein.alphabet[l1], models.protein.alphabet[l2]);
+            this_rate = ((pogofit.gtr_fit[terms.global])[rate_search])[terms.fit.MLE];
+            if (this_rate == 0.0) 
+            {
+                efv_sum = pogofit.final_efv[l1] + pogofit.final_efv[l2];
+                this_rate = 1./ ((pogofit.final_efv[l1] + pogofit.final_efv[l2]) * summation);
+            }
+            (rij[models.protein.alphabet[l1]])[models.protein.alphabet[l2]] = this_rate;
+        }
+    }
+    return rij
+}
+
+
+
+
 function pogofit.write_model_to_file() {
 
     pogofit.external_order   = {{"A", "R", "N", "D", "C", "Q", "E", "G", "H", "I", "L", "K", "M", "F", "P", "S", "T", "W", "Y", "V"}};
