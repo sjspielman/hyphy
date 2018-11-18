@@ -335,8 +335,6 @@ function pogofit.extract_efv () {
     if (pogofit.frequency_type == pogofit.emp_freq) {
         fitted_efv = (pogofit.gtr_fit[terms.efv_estimate])["VALUEINDEXORDER"][0];
     }
-    //console.log((results[terms.efv_estimate])["VALUEINDEXORDER"][0]);
-    //console.log(pogofit.fitted_efv);
     return fitted_efv
 }
 
@@ -364,15 +362,12 @@ function pogofit.extract_rates_imputation() {
 
 
     pogofit.thekeys =  utility.Keys(pogofit.site_counts);
-    console.log(pogofit.thekeys);
     summation = 0.0;
     for (x = 0; x < utility.Array1D(pogofit.thekeys); x+=1)
     {
         this_key = pogofit.thekeys[x];
         summation += ((1. + pogofit.site_counts[this_key]) * pogofit.tree_lengths[this_key] );            
     }
-    console.log(summation);
-    
     
     rij = {};
     for (l1 = 0; l1 < 20 - 1; l1 += 1) {

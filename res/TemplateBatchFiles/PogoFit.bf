@@ -22,8 +22,6 @@ LoadFunctionLibrary("PogoFit_helper.ibf"); // Functions, model definitions used 
 
 
 
-//utility.ToggleEnvVariable ("OPTIMIZATION_PRECISION", 0.9); // TESTING
-
 utility.ToggleEnvVariable ("NORMALIZE_SEQUENCE_NAMES", 1);
 
 pogofit.analysis_banner = {
@@ -98,13 +96,6 @@ pogofit.file_list_count     = Abs (pogofit.file_list);
 pogofit.index_to_filename   = utility.SwapKeysAndValues(pogofit.file_list);
 
 
-// For testing, set to defaults:
-pogofit.baseline_model = "JTT";
-pogofit.frequency_type = pogofit.emp_freq;
-pogofit.output_format = pogofit.output_all;
-pogofit.imputation = pogofit.impute;
-
-/*
 pogofit.baseline_model  = io.SelectAnOption (models.protein.empirical_models,
                                                 "Select an empirical protein model to use for optimizing the provided branch lengths:");
 
@@ -124,9 +115,6 @@ pogofit.output_format  = io.SelectAnOption ({
 pogofit.imputation  = io.SelectAnOption ({{pogofit.impute, "Impute zero rates as in Nickle et al. 2007 (Recommended)"},
                                           {pogofit.no_impute, "Leave zero rates at zero"}},
                                            "Impute zero rates for final model files (*excluding* JSON)?:");
-*/
-
-
 
 pogofit.use_rate_variation = "Gamma"; 
 
@@ -236,8 +224,6 @@ if (pogofit.imputation == pogofit.impute)
 
     // Site counts for each alignment
     pogofit.site_counts = {};
-    //console.log(pogofit.analysis_results);
-    //exit();
     utility.ForEachPair( (pogofit.analysis_results[terms.json.input])[pogofit.options.dataset_information], "_key_", "_value_",
     '
         pogofit.site_counts[_key_] = _value_[terms.json.sites];
