@@ -233,6 +233,98 @@ function pogofit.fitGTR (current_results) {
     return pogofit.rev_mle;
 
 }
+
+
+
+
+
+function pogofit.fitGTR_twophase(current_results, phase, isfinalphase) {
+
+    //file_list = utility.Keys (current_results); ---> pogofit.file_list
+    //file_count = utility.Array1D (file_list);   ---> pogofit.file_list_count
+    // NOTE: pogofit.index_to_filename is {filename:0, filename:1}
+
+    partition_info = {};
+    filter_info    = {};
+    trees = {};
+    initial_values = {terms.global : {}, terms.branch_length : {}};
+    proportional_scalers = {};
+    index_to_file_name   = {};
+
+    for (file_index = 0; file_index < pogofit.file_list_count; file_index += 1) {
+        file_path = pogofit.file_list [file_index];
+        dataset_name = "pogofit.msa." + file_index;
+        partition_info [file_index] = alignments.ReadNucleotideDataSet (dataset_name, file_path);
+        partition_specification = { "0" : {terms.data.name : "all", terms.data.filter_string : "", term.data.tree : ((current_results[file_index])[terms.fit.trees])[0]}};
+
+
+        filter_info [file_index] = (alignments.DefineFiltersForPartitions (partition_specification,
+                                                                            dataset_name ,
+                                                                            dataset_name,
+                                                                            partition_info [file_index]))[0];
+        trees [file_index] = {terms.trees.newick :  ((current_results[file_index])[terms.fit.trees])[0]};
+        (initial_values[terms.branch_length])[file_index] = ((current_results[file_index])[terms.branch_length])[0];
+        if (phase == pogofit.prefinal_phase) {
+            scaler = "pogofit.gtr_scaler_" + file_index;
+            parameters.DeclareGlobalWithRanges (scaler, 1, 0, 1000);
+            proportional_scalers[file_index] = scaler;
+        }
+
+    
+    }
+
+    utility.SetEnvVariable ("VERBOSITY_LEVEL", 1);
+    utility.ToggleEnvVariable ("AUTO_PARALLELIZE_OPTIMIZE", 1);
+    utility.ToggleEnvVariable ("OPTIMIZATION_METHOD", 0);
+
+    if (phase == pogofit.prefinal_phase) {
+        // Set initial values 
+        for (l1 = 0; l1 < 20; l1 += 1) {
+            for (l2 = l1 + 1; l2 < 20; l2 += 1) {
+                (initial_values[terms.global]) [terms.aminoacidRate (models.protein.alphabet[l1],models.protein.alphabet[l2])] = {terms.fit.MLE : 0.1}; // set all to 1
+            }
+        }
+        // fit the model
+        pogofit.mle = estimators.FitSingleModel_Ext (
+                                            utility.Map (filter_info, "_value_", "_value_[terms.data.name]"),
+                                            trees,
+                                            protein_gtr.rev_model,
+                                            initial_values,
+                                            {terms.run_options.proportional_branch_length_scaler : proportional_scalers}
+                                       );
+
+    } else
+    {
+        // FINAL TUNING
+        pogofit.mle = estimators.FitSingleModel_Ext (
+                                            utility.Map (filter_info, "_value_", "_value_[terms.data.name]"),
+                                            trees,
+                                            pogofit.rev_model,
+                                            initial_values,
+                                             {terms.run_options.retain_lf_object : TRUE}
+                                       );
+    }
+
+                                      
+    // Save the rev.mle into the analysis_results, and cache it.
+    (^"pogofit.analysis_results")[phase] = pogofit.mle;
+
+    console.log (""); // clear past the optimization progress line
+    //utility.SetEnvVariable ("VERBOSITY_LEVEL", 0);
+    utility.ToggleEnvVariable ("AUTO_PARALLELIZE_OPTIMIZE", None);
+    utility.ToggleEnvVariable ("OPTIMIZATION_METHOD", None);
+
+
+    // Trees as dictionary for compatibility with rest of the output.
+    pogofit.mle[terms.fit.trees] = utility.SwapKeysAndValues(utility.MatrixToDict(pogofit.mle[terms.fit.trees]));
+    
+    return pogofit.mle;
+
+}
+
+
+
+
 /********************************************************************************************************************/
 /********************************************************************************************************************/
 /********************************************************************************************************************/
