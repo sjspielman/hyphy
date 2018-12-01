@@ -21,6 +21,10 @@ LoadFunctionLibrary("PogoFit_helper.ibf"); // Functions, model definitions used 
 /*------------------------------------------------------------------------------*/
 
 
+utility.ToggleEnvVariable ("OPTIMIZATION_PRECISION", 0.1);
+
+
+
 
 utility.ToggleEnvVariable ("NORMALIZE_SEQUENCE_NAMES", 1);
 
@@ -35,6 +39,7 @@ pogofit.analysis_banner = {
 io.DisplayAnalysisBanner(pogofit.analysis_banner);
 
 pogofit.baseline_phase   = "Baseline Fit";
+pogofit.prefinal_phase   = "Pre-GTR Fit";
 pogofit.final_phase      = "GTR Fit";
 
 pogofit.options.imputation = "Impute zero rates";
@@ -192,14 +197,21 @@ pogofit.stopTimer (pogofit.timers, pogofit.baseline_phase);
 /******************************************* STEP TWO *******************************************************
         Fit a full GTR model to all dataset(s) jointly, using the baseline model as initial rates
 *************************************************************************************************************/
-console.log("\n\n[PHASE 2] Optimizing protein model");
-
-pogofit.startTimer (pogofit.timers, pogofit.final_phase);
 
 pogofit.baseline_fit = utility.Map (utility.Filter (pogofit.analysis_results, "_value_", "_value_/'" + pogofit.baseline_phase + "'"), "_value_", "_value_['" + pogofit.baseline_phase + "']");
-pogofit.gtr_fit = pogofit.fitGTR(pogofit.baseline_fit);
-                                                                                                                              
-pogofit.stopTimer (pogofit.timers, pogofit.final_phase);/*************************************************************************************************************/
+//pogofit.gtr_fit = pogofit.fitGTR(pogofit.baseline_fit);
+
+
+console.log("\n\n[PHASE 2] Optimizing protein model with proportional branch lengths");
+pogofit.startTimer (pogofit.timers, pogofit.prefinal_phase);
+pogofit.gtr_fit_propbl = pogofit.fitGTR(pogofit.baseline_fit);
+pogofit.stopTimer (pogofit.timers, pogofit.prefinal_phase);
+
+console.log("\n\n[PHASE 3] Optimizing final protein model");
+pogofit.startTimer (pogofit.timers, pogofit.final_phase);
+pogofit.gtr_fit = pogofit.fitGTR(pogofit.gtr_fit_propbl);
+pogofit.stopTimer (pogofit.timers, pogofit.final_phase);
+                                                                                             
 /*************************************************************************************************************/
 
 
