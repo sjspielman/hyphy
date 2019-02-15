@@ -15,13 +15,13 @@ LoadFunctionLibrary("libv3/models/rate_variation.bf");
 LoadFunctionLibrary("libv3/models/protein/empirical.bf");
 LoadFunctionLibrary("libv3/models/protein/REV.bf");
 LoadFunctionLibrary("libv3/models/protein.bf");
-LoadFunctionLibrary("PogoFit_helper.ibf"); // Functions, model definitions used for this batchfile.
+LoadFunctionLibrary("pogohelper_revthingstuff.bf"); // Functions, model definitions used for this batchfile.
 
 
 /*------------------------------------------------------------------------------*/
 
-
-//utility.ToggleEnvVariable ("OPTIMIZATION_TIME_HARD_LIMIT", 3);
+//utility.ToggleEnvVariable ("OPTIMIZATION_TIME_HARD_LIMIT", 0.1);
+//utility.ToggleEnvVariable("OPTIMIZATION_PRECISION", 0.1); // TESTING ONLY!!
 utility.ToggleEnvVariable ("NORMALIZE_SEQUENCE_NAMES", 1);
 
 pogofit.analysis_banner = {
@@ -36,6 +36,13 @@ io.DisplayAnalysisBanner(pogofit.analysis_banner);
 
 pogofit.baseline_phase   = "Baseline Fit";
 pogofit.final_phase      = "GTR Fit";
+
+pogofit.phase1   = "Baseline Fit";
+pogofit.phase2   = "GTR with baseline branch lengths";
+pogofit.phase3   = "Reoptimizing branch lengths";
+pogofit.phase4   = "GTR Fit";
+
+
 
 pogofit.options.imputation = "Impute zero rates";
 pogofit.options.dataset_information = "Dataset information";
@@ -75,6 +82,7 @@ pogofit.timers = {};
 pogofit.one_or_many  = io.SelectAnOption ({{pogofit.multiple, "Infer a protein model from multiple training datasets (this is more common)."}, 
                                                {pogofit.single, "Infer a protein model from a single training datasets."}}, 
                                                 "How many datasets will be used to fit the protein model?");                                    
+
 if (pogofit.one_or_many == pogofit.single)
 {
     pogofit.input_file = io.PromptUserForString ("Provide the filename of the alignment to analyze");
@@ -88,7 +96,7 @@ if (pogofit.one_or_many == pogofit.multiple)
     pogofit.input_file  = utility.getGlobalValue("LAST_FILE_PATH");
 }
 
-
+ 
 pogofit.output_model_prefix = pogofit.input_file;
 pogofit.json_file           = pogofit.input_file  + ".POGOFIT.json";
 pogofit.file_list           = io.validate_a_list_of_files (pogofit.file_list);
@@ -116,7 +124,13 @@ pogofit.imputation  = io.SelectAnOption ({{pogofit.impute, "Impute zero rates as
                                           {pogofit.no_impute, "Leave zero rates at zero"}},
                                            "Impute zero rates for final model files (*excluding* JSON)?:");
 
-pogofit.use_rate_variation = "Yes"; 
+/*
+pogofit.baseline_model = "JTT";
+pogofit.frequency_type = "Emp";
+pogofit.output_format = "PAML";
+pogofit.imputation = "Yes";
+*/
+pogofit.use_rate_variation = "Gamma"; 
 
 pogofit.save_options();
 
@@ -130,7 +144,8 @@ if (pogofit.frequency_type == pogofit.emp_freq){
 if (pogofit.frequency_type == pogofit.ml_freq){
     pogofit.rev_model = "models.protein.REVML.ModelDescription.withGamma";
 }
-
+pogofit.rev_model_nogamma = "models.protein.REV.ModelDescription";
+pogofit.rev_model_gamma   = "models.protein.REV.ModelDescription.withGamma";
 
 /********************************************************************************************************************/
 /********************************************* ANALYSIS BEGINS HERE *************************************************/
@@ -155,7 +170,8 @@ pogofit.queue = mpi.CreateQueue ({  utility.getGlobalValue("terms.mpi.Headers") 
                                         },
                                         utility.getGlobalValue("terms.mpi.Variables") : {{
                                             "pogofit.baseline_model_desc",
-                                            "pogofit.rev_model",
+                                            "pogofit.rev_model_nogamma",
+                                            "pogofit.rev_model_gamma",
                                             "pogofit.baseline_model",
                                             "pogofit.index_to_filename",
                                             "pogofit.analysis_results",
@@ -171,7 +187,7 @@ pogofit.queue = mpi.CreateQueue ({  utility.getGlobalValue("terms.mpi.Headers") 
 *************************************************************************************************************/
 console.log("\n\n[PHASE 1] Performing initial branch length optimization using " + pogofit.baseline_model);
 
-pogofit.startTimer (pogofit.timers, pogofit.baseline_phase);
+pogofit.startTimer (pogofit.timers, pogofit.phase1);
 pogofit.timer_count +=1; 
 
 for (file_index = 0; file_index < pogofit.file_list_count; file_index += 1) {
@@ -182,7 +198,7 @@ for (file_index = 0; file_index < pogofit.file_list_count; file_index += 1) {
                                                             "pogofit.handle_baseline_callback");
 }
 mpi.QueueComplete (pogofit.queue);
-pogofit.stopTimer (pogofit.timers, pogofit.baseline_phase);
+pogofit.stopTimer (pogofit.timers, pogofit.phase1);
 /*************************************************************************************************************/
 /*************************************************************************************************************/
 
@@ -190,21 +206,45 @@ pogofit.stopTimer (pogofit.timers, pogofit.baseline_phase);
 
 
 /******************************************* STEP TWO *******************************************************
-        Fit a full GTR model to all dataset(s) jointly, using the baseline model as initial rates
+        Fit a full GTR model to all dataset(s) jointly, using the baseline model as initial rates.
+        NO GAMMA.
 *************************************************************************************************************/
-console.log("\n\n[PHASE 2] Optimizing protein model");
+console.log("\n\n[PHASE 2] Optimizing protein model under baseline branch lengths");
 
-pogofit.startTimer (pogofit.timers, pogofit.final_phase);
+pogofit.startTimer (pogofit.timers, pogofit.phase2);
 
 pogofit.baseline_fit = utility.Map (utility.Filter (pogofit.analysis_results, "_value_", "_value_/'" + pogofit.baseline_phase + "'"), "_value_", "_value_['" + pogofit.baseline_phase + "']");
 
-pogofit.gtr_fit = pogofit.fitGTR(pogofit.baseline_fit);
-                                                                                                                              
-pogofit.stopTimer (pogofit.timers, pogofit.final_phase);
+pogofit.gtr_fit = pogofit.fitGTR_nogamma(pogofit.baseline_fit, pogofit.phase2);                                                                                               
+pogofit.stopTimer (pogofit.timers, pogofit.phase2);
+
+/* Extract the EFV for use in all model fits (until final tuneup) */
+pogofit.shared_EFV = (utility.Values (pogofit.gtr_fit [terms.efv_estimate]))[0];
+if (Type (pogofit.shared_EFV) == "String") {
+    pogofit.shared_EFV = Eval (pogofit.shared_EFV);
+}
 /*************************************************************************************************************/
 /*************************************************************************************************************/
 
-console.log("\n\n Saving results");
+console.log("\n\n[PHASE 3] Optimizing branch lengths under initial model fit");
+
+
+pogofit.startTimer (pogofit.timers, pogofit.phase3);
+pogofit.run_gtr_iteration_branch_lengths();                                                                                                                              
+pogofit.stopTimer (pogofit.timers, pogofit.phase3);
+/*************************************************************************************************************/
+/*************************************************************************************************************/
+
+
+/*************************************************************************************************************/
+/*************************************************************************************************************/
+
+console.log("\n\n[PHASE 4] Optimizing model with optimized branch lengths");
+pogofit.startTimer (pogofit.timers, pogofit.phase4);
+pogofit.gtr_fit = pogofit.fitGTR_gamma(pogofit.analysis_results[pogofit.phase3], pogofit.analysis_results[pogofit.phase2], pogofit.phase4);                                                                                               
+pogofit.stopTimer (pogofit.timers, pogofit.phase4);
+/*************************************************************************************************************/
+/*************************************************************************************************************/
 
 
 /*********************** Save custom model to file(s) as specified **************************/

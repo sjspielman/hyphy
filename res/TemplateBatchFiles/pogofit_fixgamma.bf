@@ -15,13 +15,13 @@ LoadFunctionLibrary("libv3/models/rate_variation.bf");
 LoadFunctionLibrary("libv3/models/protein/empirical.bf");
 LoadFunctionLibrary("libv3/models/protein/REV.bf");
 LoadFunctionLibrary("libv3/models/protein.bf");
-LoadFunctionLibrary("PogoFit_helper.ibf"); // Functions, model definitions used for this batchfile.
+LoadFunctionLibrary("pogofit_helper_fixgamma.bf"); // Functions, model definitions used for this batchfile.
 
 
 /*------------------------------------------------------------------------------*/
 
+//utility.ToggleEnvVariable ("OPTIMIZATION_TIME_HARD_LIMIT", 15);
 
-//utility.ToggleEnvVariable ("OPTIMIZATION_TIME_HARD_LIMIT", 3);
 utility.ToggleEnvVariable ("NORMALIZE_SEQUENCE_NAMES", 1);
 
 pogofit.analysis_banner = {
@@ -120,16 +120,24 @@ pogofit.use_rate_variation = "Yes";
 
 pogofit.save_options();
 
+/*
 pogofit.baseline_model_name = pogofit.baseline_model + "+F, with 4 category Gamma rates";
 pogofit.baseline_model_desc = "pogofit.Baseline.ModelDescription.withGamma";
 pogofit.initial_rates       = Eval("models.protein." + pogofit.baseline_model + ".Rij");
 
 if (pogofit.frequency_type == pogofit.emp_freq){
-    pogofit.rev_model = "models.protein.REV.ModelDescription.withGamma";
+    pogofit.rev_model = "models.protein.REV.ModelDescription";
 }
 if (pogofit.frequency_type == pogofit.ml_freq){
-    pogofit.rev_model = "models.protein.REVML.ModelDescription.withGamma";
+    pogofit.rev_model = "models.protein.REVML.ModelDescription";
 }
+*/
+pogofit.baseline_model_name = pogofit.baseline_model + "+F, with 4 category Gamma rates";
+pogofit.baseline_model_desc_nogamma = "pogofit.Baseline.ModelDescription";
+pogofit.baseline_model_desc_gamma = "pogofit.Baseline.ModelDescription.withGamma";
+
+pogofit.initial_rates       = Eval("models.protein." + pogofit.baseline_model + ".Rij");
+pogofit.rev_model           = "models.protein.REV.ModelDescription.withGamma";
 
 
 /********************************************************************************************************************/
@@ -154,7 +162,8 @@ pogofit.queue = mpi.CreateQueue ({  utility.getGlobalValue("terms.mpi.Headers") 
                                             }
                                         },
                                         utility.getGlobalValue("terms.mpi.Variables") : {{
-                                            "pogofit.baseline_model_desc",
+                                            "pogofit.baseline_model_desc_gamma",
+                                            "pogofit.baseline_model_desc_nogamma",
                                             "pogofit.rev_model",
                                             "pogofit.baseline_model",
                                             "pogofit.index_to_filename",
@@ -167,25 +176,17 @@ pogofit.queue = mpi.CreateQueue ({  utility.getGlobalValue("terms.mpi.Headers") 
 
 
 /******************************************* STEP ONE *******************************************************
-        Perform an initial fit of the Baseline model+F+4G to the each dataset independently
+        Perform an initial fit of the Baseline model+F+4G for full data. Estimates shared alpha as well.
 *************************************************************************************************************/
 console.log("\n\n[PHASE 1] Performing initial branch length optimization using " + pogofit.baseline_model);
 
 pogofit.startTimer (pogofit.timers, pogofit.baseline_phase);
-pogofit.timer_count +=1; 
 
-for (file_index = 0; file_index < pogofit.file_list_count; file_index += 1) {
+pogofit.baseline_fit = pogofit.fitBaselineTogether();
 
-     io.ReportProgressMessageMD ("Protein GTR Fitter", " * Initial branch length fit",
-                                     "Dispatching file '" + pogofit.file_list[file_index]);
-     mpi.QueueJob (pogofit.queue, "pogofit.fitBaselineToFile", {"0" : pogofit.file_list[file_index]},
-                                                            "pogofit.handle_baseline_callback");
-}
-mpi.QueueComplete (pogofit.queue);
 pogofit.stopTimer (pogofit.timers, pogofit.baseline_phase);
 /*************************************************************************************************************/
 /*************************************************************************************************************/
-
 
 
 
@@ -196,9 +197,9 @@ console.log("\n\n[PHASE 2] Optimizing protein model");
 
 pogofit.startTimer (pogofit.timers, pogofit.final_phase);
 
-pogofit.baseline_fit = utility.Map (utility.Filter (pogofit.analysis_results, "_value_", "_value_/'" + pogofit.baseline_phase + "'"), "_value_", "_value_['" + pogofit.baseline_phase + "']");
+//pogofit.baseline_fit = utility.Map (utility.Filter (pogofit.analysis_results, "_value_", "_value_/'" + pogofit.baseline_phase + "'"), "_value_", "_value_['" + pogofit.baseline_phase + "']");
 
-pogofit.gtr_fit = pogofit.fitGTR(pogofit.baseline_fit);
+pogofit.gtr_fit = pogofit.fitGTR_fixalpha(pogofit.baseline_fit);
                                                                                                                               
 pogofit.stopTimer (pogofit.timers, pogofit.final_phase);
 /*************************************************************************************************************/
