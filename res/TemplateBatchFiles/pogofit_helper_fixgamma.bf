@@ -236,13 +236,13 @@ function pogofit.fitBaselineTogether () {
 /********************************************** UTILITY FUNCTIONS ***************************************************/
 /********************************************************************************************************************/
 
-lfunction pogofit.startTimer(timers, key) {
+function pogofit.startTimer(timers, key) {
     timers[key] = {
         terms.timers.timer: Time(1),
     };
 
 }
-lfunction pogofit.stopTimer(timers, key) {
+function pogofit.stopTimer(timers, key) {
     (timers[key])[terms.timers.timer] = Time(1) - (timers[key])[terms.timers.timer];
 }
 
