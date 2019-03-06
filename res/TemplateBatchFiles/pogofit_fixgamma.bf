@@ -21,7 +21,7 @@ LoadFunctionLibrary("pogofit_helper_fixgamma.bf"); // Functions, model definitio
 /*------------------------------------------------------------------------------*/
 
 // do not uncomment this line; debugging purposes ONLY.
-utility.ToggleEnvVariable ("OPTIMIZATION_TIME_HARD_LIMIT", 2);
+//utility.ToggleEnvVariable ("OPTIMIZATION_TIME_HARD_LIMIT", 2);
 
 utility.ToggleEnvVariable ("NORMALIZE_SEQUENCE_NAMES", 1);
 
