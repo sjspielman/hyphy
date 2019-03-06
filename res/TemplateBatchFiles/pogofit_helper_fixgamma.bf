@@ -287,7 +287,7 @@ function pogofit.extract_rates_imputation() {
             {
                 efv_sum = pogofit.final_efv[l1] + pogofit.final_efv[l2];
                 this_rate = 1./ ((pogofit.final_efv[l1] + pogofit.final_efv[l2]) * summation);
-            }
+            }           
             (rij[models.protein.alphabet[l1]])[models.protein.alphabet[l2]] = this_rate;
         }
     }

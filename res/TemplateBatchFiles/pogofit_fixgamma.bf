@@ -21,7 +21,7 @@ LoadFunctionLibrary("pogofit_helper_fixgamma.bf"); // Functions, model definitio
 /*------------------------------------------------------------------------------*/
 
 // do not uncomment this line; debugging purposes ONLY.
-//utility.ToggleEnvVariable ("OPTIMIZATION_TIME_HARD_LIMIT", 2);
+utility.ToggleEnvVariable ("OPTIMIZATION_TIME_HARD_LIMIT", 2);
 
 utility.ToggleEnvVariable ("NORMALIZE_SEQUENCE_NAMES", 1);
 
@@ -182,17 +182,19 @@ if (pogofit.imputation == pogofit.impute)
 
     // Site counts for each alignment
     pogofit.site_counts = {};
-    utility.ForEachPair( (pogofit.analysis_results[terms.json.input])[pogofit.options.dataset_information], "_key_", "_value_",
+    utility.ForEachPair( pogofit.input[pogofit.options.dataset_information], "_key_", "_value_",
     '
         pogofit.site_counts[_key_] = _value_[terms.json.sites];
     '
     );
+
     pogofit.final_rij = pogofit.extract_rates_imputation();
 }
 else 
 {
     pogofit.final_rij = pogofit.extract_rates();
 }
+
 pogofit.write_model_to_file();
 
 /************************************* Save analysis JSON ***********************************/
