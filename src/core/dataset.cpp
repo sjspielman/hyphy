@@ -132,7 +132,7 @@ BaseRef _DataSet::makeDynamic(void) const {
 void _DataSet::ResetIHelper(void) {
   if (dsh && dsh->characterPositions.lLength == 256)
     for (long k = 0; k < 256; k++) {
-      dsh->characterPositions.lData[k] = -1;
+      dsh->characterPositions.list_data[k] = -1;
     }
 }
 
@@ -145,14 +145,14 @@ void _DataSet::ConvertRepresentations(void) {
     if (lLength == 0) {
       AppendNewInstance(new _StringBuffer (128UL));
     } else {
-      _Site *aSite = (_Site *)lData[0];
+      _Site *aSite = (_Site *)list_data[0];
 
       for (long str = 0; str < aSite->length(); str++) {
         horStrings < new _StringBuffer (DATA_SET_SWITCH_THRESHOLD);
       }
 
       for (long s = 0; s < lLength; s++) {
-        _Site *aSite = (_Site *)lData[s];
+        _Site *aSite = (_Site *)list_data[s];
         if (aSite->length() > horStrings.lLength || aSite->GetRefNo() != -1) {
           HandleApplicationError("Irrecoverable internal error in "
                                  "_DataSet::ConvertRepresentations. Sorry "
@@ -162,7 +162,7 @@ void _DataSet::ConvertRepresentations(void) {
         }
 
         for (long s2 = 0L; s2 < aSite->length(); s2++) {
-          (*(_StringBuffer *)horStrings.lData[s2]) << aSite->get_char(s2);
+          (*(_StringBuffer *)horStrings.list_data[s2]) << aSite->get_char(s2);
         }
       }
 
@@ -182,8 +182,8 @@ void _DataSet::ConvertRepresentations(void) {
 
 void _DataSet::AddSite(char c) {
   if (streamThrough) {
-    if (theMap.lData[0] == 0) {
-      if (theMap.lData[1] == 0) {
+    if (theMap.list_data[0] == 0) {
+      if (theMap.list_data[1] == 0) {
         if (theNames.lLength) {
           fprintf(streamThrough, ">%s\n", ((_String *)theNames(0))->get_str());
         } else {
@@ -192,8 +192,8 @@ void _DataSet::AddSite(char c) {
         AppendNewInstance(new _String(kEmptyString));
       }
 
-      theMap.lData[1]++;
-      theMap.lData[2]++;
+      theMap.list_data[1]++;
+      theMap.list_data[2]++;
       fputc(c, streamThrough);
     } else {
       HandleApplicationError("Can't add more sites to a file based data set, "
@@ -212,7 +212,7 @@ void _DataSet::AddSite(char c) {
       }
     }
 
-    (*((_StringBuffer *)lData[0])) << c;
+    (*((_StringBuffer *)list_data[0])) << c;
 
     /*long  f;
 
@@ -223,7 +223,7 @@ void _DataSet::AddSite(char c) {
             dsh->characterPositions << -1;
     }
 
-    f = dsh->characterPositions.lData[c];
+    f = dsh->characterPositions.list_data[c];
 
     if (f!=-1)
     {
@@ -236,7 +236,7 @@ void _DataSet::AddSite(char c) {
     }
     else
     {
-        dsh->characterPositions.lData[c] = lLength;*/
+        dsh->characterPositions.list_data[c] = lLength;*/
     //}
   }
 }
@@ -245,29 +245,29 @@ void _DataSet::AddSite(char c) {
 void _DataSet::Write2Site(long index, char c) {
   if (streamThrough) {
     if (index == 0) {
-      if (theMap.lData[2] == theMap.lData[1]) {
-        theMap.lData[0]++;
+      if (theMap.list_data[2] == theMap.list_data[1]) {
+        theMap.list_data[0]++;
 
-        if (theNames.lLength > theMap.lData[0]) {
+        if (theNames.lLength > theMap.list_data[0]) {
           fprintf(streamThrough, "\n>%s\n",
-                  ((_String *)theNames(theMap.lData[0]))->get_str());
+                  ((_String *)theNames(theMap.list_data[0]))->get_str());
         } else {
-          fprintf(streamThrough, "\n>Sequence %ld\n", theMap.lData[0] + 1);
+          fprintf(streamThrough, "\n>Sequence %ld\n", theMap.list_data[0] + 1);
         }
 
-        theMap.lData[1] = 0;
+        theMap.list_data[1] = 0;
       } else {
         HandleApplicationError("Can't write sequences of unequal lengths to a "
                                "file based data set.");
         return;
       }
-    } else if (index != theMap.lData[1]) {
+    } else if (index != theMap.list_data[1]) {
       HandleApplicationError("Can't write sites which are not consecutive to a "
                              "file based data set.");
       return;
     }
 
-    theMap.lData[1]++;
+    theMap.list_data[1]++;
     fputc(c, streamThrough);
   } else {
     /*if (!dsh)
@@ -277,7 +277,7 @@ void _DataSet::Write2Site(long index, char c) {
     }*/
 
     if (useHorizontalRep) {
-      long currentWritten = ((_String *)lData[0])->length();
+      long currentWritten = ((_String *)list_data[0])->length();
 
       if (index >= currentWritten) {
         HandleApplicationError("Internal Error in 'Write2Site' - index is too "
@@ -291,7 +291,7 @@ void _DataSet::Write2Site(long index, char c) {
         } else {
           long s = 1;
           for (; s < lLength; s++) {
-            _StringBuffer *aString = (_StringBuffer *)lData[s];
+            _StringBuffer *aString = (_StringBuffer *)list_data[s];
             if (aString->length() == index) {
               (*aString) << c;
               break;
@@ -311,24 +311,24 @@ void _DataSet::Write2Site(long index, char c) {
             "Internal Error in 'Write2Site' - index is too high");
         return;
       }
-      _Site *s = (_Site *)lData[index];
+      _Site *s = (_Site *)list_data[index];
       long rN = s->GetRefNo();
       if (rN == -1) { // independent site
         // dsh->incompletePatterns->Delete (s,false);
         (*s) << c;
         // dsh->incompletePatterns->Insert (s,index);
       } else {
-        _Site *ss = (_Site *)lData[rN];
+        _Site *ss = (_Site *)list_data[rN];
         long sL = ss->length() - 1;
         if (ss->get_char(sL) != c) { // appending distinct char
           s->Duplicate(ss);
           s->set_char(sL, c);
-          theFrequencies.lData[rN]--;
+          theFrequencies.list_data[rN]--;
 
           rN = dsh->incompletePatterns->Find(s);
           if (rN >= 0) {
             rN = dsh->incompletePatterns->GetXtra(rN);
-            /*_Site* s2 = (_Site*)lData[rN];
+            /*_Site* s2 = (_Site*)list_data[rN];
             if (s2->GetRefNo() != -1 || !s->Equal(s2))
             {
                 WarnError ("Mapping Error");
@@ -355,10 +355,10 @@ void _DataSet::CheckMapping(long index) {
         "Internal Error in 'CheckMapping' - index is too high", true);
   }
 
-  _Site *s = (_Site *)lData[index];
+  _Site *s = (_Site *)list_data[index];
 
   for (long k = 0L; k < index; k++) {
-    _Site *ss = (_Site *)lData[k];
+    _Site *ss = (_Site *)list_data[k];
     if (ss->GetRefNo() == -1) {
       if (s->Equal(ss)) {
         theFrequencies[index]--;
@@ -417,7 +417,7 @@ void _DataSet::Finalize(void) {
       bool good = true;
       for (long s = 0; s < lLength; s++) {
         good = good &&
-               ((_String *)lData[0])->length() == ((_String *)lData[s])->length();
+               ((_String *)list_data[0])->length() == ((_String *)list_data[s])->length();
       }
 
       if (!good) {
@@ -432,13 +432,13 @@ void _DataSet::Finalize(void) {
       _List uniquePats;
       _AVLListX dupsAVL(&dups);
 
-      long siteCounter = ((_String *)lData[0])->length();
+      long siteCounter = ((_String *)list_data[0])->length();
 
       for (long i1 = 0L; i1 < siteCounter; i1++) {
         _Site *tC = new _Site();
 
         for (long i2 = 0L; i2 < lLength; i2++) {
-          (*tC) << ((_String *)lData[i2])->get_char(i1);
+          (*tC) << ((_String *)list_data[i2])->get_char(i1);
         }
 
         long ff = dupsAVL.Find(tC);
@@ -450,7 +450,7 @@ void _DataSet::Finalize(void) {
         } else {
           ff = dupsAVL.GetXtra(ff);
           theMap << ff;
-          theFrequencies.lData[ff]++;
+          theFrequencies.list_data[ff]++;
         }
 
         DeleteObject(tC);
@@ -467,7 +467,7 @@ void _DataSet::Finalize(void) {
         _AVLListX dupsAVL(&dups);
 
         for (long i1 = 0; i1 < lLength; i1++) {
-          tC = (_Site *)lData[i1];
+          tC = (_Site *)list_data[i1];
           long ff = dupsAVL.Find(tC);
           if (ff < 0) {
             dupsAVL.Insert(tC, i1);
@@ -475,7 +475,7 @@ void _DataSet::Finalize(void) {
             ff = dupsAVL.GetXtra(ff);
             tC->Clear();
             tC->SetRefNo(ff);
-            theFrequencies.lData[ff]++;
+            theFrequencies.list_data[ff]++;
           }
         }
         dupsAVL.Clear(false);
@@ -499,11 +499,11 @@ void _DataSet::Finalize(void) {
         tC = (_Site *)(*(_List *)this)(i2);
         k = tC->GetRefNo();
         if (k >= 0) {
-          j = refs.lData[k];
+          j = refs.list_data[k];
           if (j < 0) {
             HandleApplicationError(kErrorStringDatasetRefIndexError);
           } else {
-            refs.lData[i2] = j;
+            refs.list_data[i2] = j;
           }
         }
       }
@@ -572,7 +572,7 @@ void _DataSet::Compact(long index) {
 //_______________________________________________________________________
 inline char _DataSet::operator()(unsigned long site, unsigned long pos,
                                  unsigned int) const {
-  return (((_String **)lData)[theMap.lData[site]])->get_char(pos);
+  return (((_String **)list_data)[theMap.list_data[site]])->get_char(pos);
 }
 
 //_________________________________________________________
@@ -800,11 +800,11 @@ _Matrix * _DataSet::HarvestFrequencies (unsigned char unit, unsigned char atom, 
             for (unsigned long sequence_index = 0; sequence_index <hSegmentation.lLength; sequence_index ++) {
                 // loop down each column
                 
-                unsigned long mapped_sequence_index = hSegmentation.lData[sequence_index];
+                unsigned long mapped_sequence_index = hSegmentation.list_data[sequence_index];
                 // build atomic probabilities
                 
                 for (unsigned long m = 0UL; m<atom; m++ ) {
-                    unit_for_counting.set_char (m, (*this)(vSegmentation.lData[primary_site+m],mapped_sequence_index,atom));
+                    unit_for_counting.set_char (m, (*this)(vSegmentation.list_data[primary_site+m],mapped_sequence_index,atom));
                 }
                 
                 long resolution_count = theTT->MultiTokenResolutions(unit_for_counting, static_store, countGaps);
@@ -892,8 +892,8 @@ void    _DataSet::ProcessPartition (_String const & input2 , _SimpleList & targe
         if (!is_regexp) {
             is_hbl_function = hyphy_global_objects::FindBFFunctionName (input);
             if (is_hbl_function >= 0) {
-                if (GetBFFunctionArgumentCount (is_hbl_function) !=  2 && (GetBFFunctionArgumentCount (is_hbl_function) !=  2 && isVertical)) {
-                    HandleApplicationError(input.Enquote() & _String(" is not a valid callback function: must have one argument for sequences and two arguments for sites"));
+                if (GetBFFunctionArgumentCount (is_hbl_function) !=  2) {
+                    HandleApplicationError(input.Enquote() & _String(" is not a valid callback function: must have two arguments (name, sequence for sites; string, frequencies for sites)"));
                     return;
                 }
                 
@@ -908,7 +908,7 @@ void    _DataSet::ProcessPartition (_String const & input2 , _SimpleList & targe
             if (is_regexp) {
                 input.Trim(1,input.length()-2);
                 int   errCode;
-                regex = _String::PrepRegExp (&input, errCode, true);
+                regex = _String::PrepRegExp (input, errCode, true);
                 if (errCode) {
                     HandleApplicationError(_String::GetRegExpError(errCode));
                     return;
@@ -919,11 +919,15 @@ void    _DataSet::ProcessPartition (_String const & input2 , _SimpleList & targe
             
             if (!isVertical) { // partitioning sequences
                 
-               _FString * string_object = nil;
+               _FString * string_object = nil,
+                        * string_name = nil;
                if (!is_regexp) {
                         filter_formula.GetList() < new _Operation()
+                                                 < new _Operation()
                                                  < new _Operation(kEmptyString,-is_hbl_function-1L);
+                   
                    string_object = new _FString;
+                   string_name   = new _FString;
                }
                 
                 const long loop_limit = additionalFilter ? additionalFilter->lLength : totalLength;
@@ -945,11 +949,14 @@ void    _DataSet::ProcessPartition (_String const & input2 , _SimpleList & targe
                     }
                     
                     if (is_regexp) {
-                        if (pattern.RegExpMatch (regex, 0L).countitems())
-                        target << specCount;
+                        if (pattern.RegExpMatch (regex, 0L).countitems()) {
+                            target << specCount;
+                        }
                     } else {
                         string_object->SetStringContent(new _StringBuffer (pattern));
-                        filter_formula.GetIthTerm(0)->SetNumber(string_object);
+                        string_name->SetStringContent  (new _StringBuffer (*GetSequenceName(seqPos)));
+                        filter_formula.GetIthTerm(1)->SetNumber(string_object);
+                        filter_formula.GetIthTerm(0)->SetNumber(string_name);
                         if (!CheckEqual(0.,filter_formula.Compute()->Value())) {
                             target << specCount;
                         }
@@ -958,7 +965,9 @@ void    _DataSet::ProcessPartition (_String const & input2 , _SimpleList & targe
                             
                 if (!is_regexp) {
                     filter_formula.GetIthTerm(0)->SetNumber(nil);
+                    filter_formula.GetIthTerm(1)->SetNumber(nil);
                     DeleteObject (string_object);
+                    DeleteObject (string_name);
                 }
             } else {
                 
@@ -977,7 +986,7 @@ void    _DataSet::ProcessPartition (_String const & input2 , _SimpleList & targe
                     if (additionalFilter) {
                         InitializeArray(eligibleMarks, lLength, false);
                         for (long siteIndex = 0; siteIndex < additionalFilter->lLength; siteIndex ++) {
-                            eligibleMarks[theMap.lData[additionalFilter->lData[siteIndex]]] = true;
+                            eligibleMarks[theMap.list_data[additionalFilter->list_data[siteIndex]]] = true;
                         }
                     }
                     else {
@@ -997,7 +1006,7 @@ void    _DataSet::ProcessPartition (_String const & input2 , _SimpleList & targe
                                 map_site ((_Site*)GetItem(siteCounter), *tempString, otherDimension);
                                 matches = tempString->RegExpMatch (regex, 0L);
                             } else {
-                                matches = ((_Site**)lData)[siteCounter]->RegExpMatch (regex, 0L);
+                                matches = ((_Site**)list_data)[siteCounter]->RegExpMatch (regex, 0L);
                             }
                             if (matches.empty()) {
                                 eligibleMarks[siteCounter] = false;
@@ -1007,7 +1016,7 @@ void    _DataSet::ProcessPartition (_String const & input2 , _SimpleList & targe
                     DeleteObject (tempString);
                     if (additionalFilter) {
                         for (long afi = 0; afi < additionalFilter->lLength; afi++) {
-                            if (eligibleMarks[theMap.lData[additionalFilter->lData[afi]]]) {
+                            if (eligibleMarks[theMap.list_data[additionalFilter->list_data[afi]]]) {
                                 target << afi;
                             }
                         }
@@ -1032,7 +1041,7 @@ void    _DataSet::ProcessPartition (_String const & input2 , _SimpleList & targe
                     if (additionalFilter) {
                         InitializeArray(eligibleMarks, theMap.lLength, false);
                         for (long siteIndex = 0; siteIndex < additionalFilter->lLength; siteIndex ++) {
-                            eligibleMarks[additionalFilter->lData[siteIndex]] = true;
+                            eligibleMarks[additionalFilter->list_data[siteIndex]] = true;
                         }
                     }
                     else {
@@ -1148,16 +1157,16 @@ void    _DataSet::ProcessPartition (_String const & input2 , _SimpleList & targe
                     }
                     while (anchor<totalLength-k) {
                         for (count = 0; count< numbers.lLength; count++) {
-                            target<<anchor+numbers.lData[count];
+                            target<<anchor+numbers.list_data[count];
                         }
                         anchor+=k;
                     }
                     if ( (k=totalLength-1-anchor) ) {
                         for (count = 0; count< numbers.lLength; count++) {
-                            if (numbers.lData[count]>k) {
+                            if (numbers.list_data[count]>k) {
                                 break;
                             }
-                            target<<anchor+numbers.lData[count];
+                            target<<anchor+numbers.list_data[count];
                         }
                     }
                     return;
@@ -1285,7 +1294,7 @@ _DataSet *_DataSet::Concatenate(_SimpleList const &ref)
   for (long k = 1; k < maxSpecies; k++) {
     siteIndex = 0;
     for (long i = 0; i < ref.lLength; i++) {
-      currentSet = (_DataSet *)dataSetList(ref.lData[i]);
+      currentSet = (_DataSet *)dataSetList(ref.list_data[i]);
 
       long cns = currentSet->NoOfSpecies(), cnc = currentSet->NoOfColumns();
 
@@ -1418,8 +1427,6 @@ bool    StoreADataSet (_DataSet* ds, _String* setName) {
         existing_ds->NoOfColumns () != ds->NoOfColumns() ||
         existing_ds->NoOfUniqueColumns () != ds->NoOfUniqueColumns() ||
         existing_ds->GetTT () != ds->GetTT();
-        
-        
         
         for (AVLListXLIteratorKeyValue filter_key_value : ObjectIndexer (HY_BL_DATASET_FILTER)) {
             _DataSetFilter * filter = (_DataSetFilter*) filter_key_value.get_object();
@@ -1963,203 +1970,146 @@ _DataSet* ReadDataSetFile (FILE*f, char execBF, _String* theS, _String* bfName, 
     bool     doAlphaConsistencyCheck = true;
     _DataSet* result = new _DataSet;
     
+    try {
     
-    _String         CurrentLine = hy_env::data_file_tree_string & "={{}};",
-                    savedLine;
-    
-    _ExecutionList reset (CurrentLine);
-    reset.Execute();
-#ifdef __HYPHYMPI__
-    if (hy_mpi_node_rank == 0L)
-#endif
-    terminate_execution = false;
-    
-    hy_env::EnvVariableSet(hy_env::data_file_tree, new HY_CONSTANT_FALSE, false);
-    
-    // initialize the instance of a file state variable
-    FileState   fState;
-    fState.translationTable =  dT;
-    fState.curSpecies =
-    fState.totalSpeciesRead =
-    fState.totalSitesRead =
-    fState.totalSpeciesExpected =
-    fState.totalSitesExpected =
-    fState.curSite =
-    fState.currentFileLine =
-    fState.maxStringLength   = 0;
-    fState.acceptingCommands = true;
-    fState.allSpeciesDefined = false;
-    fState.interleaved       = false;
-    fState.isSkippingInNEXUS = false;
-    fState.autoDetect        = true;
-    fState.fileType          = -1;
-    fState.baseLength        = 4;
-    fState.repeat            = '.',
-    fState.skip            = 0;
-    fState.theSource         = theS;
-    fState.pInSrc            = 0;
-    fState.theNamespace      = namespaceID;
-    
-    if (!(f||theS)) {
-        HandleApplicationError("ReadDataSetFile received null file AND string references. At least one must be specified");
-    }
-    // done initializing
-    
-    long     fileLength = 0;
-    
-#ifdef __HYPHYMPI__
-    if (hy_mpi_node_rank == 0L) {
-#endif
-        if       (f) {
-            fseek    (f,0,SEEK_END);
-            fileLength = ftell(f);
-            rewind  (f);
-        } else {
-            fileLength = theS->length();
-        }
+        _String         CurrentLine = hy_env::data_file_tree_string & "={{}};",
+                        savedLine;
         
-#ifdef __HYPHYMPI__
-    }
-#endif
-    
-    
-    
-    //if (f==NULL) return (_DataSet*)result.makeDynamic();
-    // nothing to do
-    
-    CurrentLine = kEmptyString;
-    
-    ReadNextLine (f,&CurrentLine,&fState);
-    if (CurrentLine.empty()) {
-        HandleApplicationError("Empty File Encountered By ReadDataSet.");
-        return result;
-    } else {
-        if (CurrentLine.BeginsWith (kNEXUS,false)) {
-            ReadNexusFile (fState,f,(*result));
-            doAlphaConsistencyCheck = false;
+        _ExecutionList reset (CurrentLine);
+        reset.Execute();
+    #ifdef __HYPHYMPI__
+        if (hy_mpi_node_rank == 0L)
+    #endif
+        terminate_execution = false;
+        
+        hy_env::EnvVariableSet(hy_env::data_file_tree, new HY_CONSTANT_FALSE, false);
+        
+        // initialize the instance of a file state variable
+        FileState   fState;
+        fState.translationTable =  dT;
+        fState.curSpecies =
+        fState.totalSpeciesRead =
+        fState.totalSitesRead =
+        fState.totalSpeciesExpected =
+        fState.totalSitesExpected =
+        fState.curSite =
+        fState.currentFileLine =
+        fState.maxStringLength   = 0;
+        fState.acceptingCommands = true;
+        fState.allSpeciesDefined = false;
+        fState.interleaved       = false;
+        fState.isSkippingInNEXUS = false;
+        fState.autoDetect        = true;
+        fState.fileType          = -1;
+        fState.baseLength        = 4;
+        fState.repeat            = '.',
+        fState.skip            = 0;
+        fState.theSource         = theS;
+        fState.pInSrc            = 0;
+        fState.theNamespace      = namespaceID;
+        
+        if (!(f||theS)) {
+            throw _String ("ReadDataSetFile received null file AND string references. At least one must be specified");
+        }
+        // done initializing
+        
+        long     fileLength = 0;
+        
+    #ifdef __HYPHYMPI__
+        if (hy_mpi_node_rank == 0L) {
+    #endif
+            if       (f) {
+                fseek    (f,0,SEEK_END);
+                fileLength = ftell(f);
+                rewind  (f);
+            } else {
+                fileLength = theS->length();
+            }
+            
+    #ifdef __HYPHYMPI__
+        }
+    #endif
+        
+        
+        
+        //if (f==NULL) return (_DataSet*)result.makeDynamic();
+        // nothing to do
+        
+        CurrentLine = kEmptyString;
+        
+        ReadNextLine (f,&CurrentLine,&fState);
+        if (CurrentLine.empty()) {
+            throw _String ("Empty File Encountered By ReadDataSet.");
         } else {
-            long i,j,k, filePosition = -1, saveSpecExpected = 0x7FFFFFFF;
-            char c;
-            while (CurrentLine.nonempty()) { // stuff to do
-                                          // check if the line has a command in it
-                
-                c = CurrentLine.FirstNonSpace();
-                while (1) {
-                    if (fState.acceptingCommands) {
-                        if (c == '$') { // command line
-                            processCommand(&CurrentLine, &fState);
-                            break;
-                        }
-                    }
+            if (CurrentLine.BeginsWith (kNEXUS,false)) {
+                ReadNexusFile (fState,f,(*result));
+                doAlphaConsistencyCheck = false;
+            } else {
+                long i,j,k, filePosition = -1, saveSpecExpected = 0x7FFFFFFF;
+                char c;
+                while (CurrentLine.nonempty()) { // stuff to do
+                                              // check if the line has a command in it
                     
-                    if (!fState.skip) {
-                        fState.skip = fState.translationTable->GetSkipChar();
-                    }
-                    fState.acceptingCommands = FALSE;
-                    
-                    if (fState.fileType==-1) { // undecided file type - assume it is PHYLIP sequential
-                        if ((c == '#')||(c=='>')) { // hash-mark format
-                            fState.fileType = 0;
-                        } else { // assume this is a sequential PHYLIP file
-                            fState.fileType = 1;
-                            fState.interleaved = false;
-                        }
-                        
-                    }
-                    // decide what to do next
-                    // if format is PHYLIP and we do not know the expected dimensions,
-                    //   we must read those in first
-                    if (fState.fileType==1) { // PHYLIP
-                        if ((filePosition<0)&&(fState.autoDetect)) {
-                            filePosition = (f?
-                                            ftell (f)
-#ifdef __WINDOZE__
-                                            -1
-#endif
-                                            :fState.pInSrc);
-                            savedLine = CurrentLine;
-                        }
-                        
-                        if (fState.totalSitesExpected==0 || fState.totalSpeciesExpected==0) { // must read dimensions first
-                            i = CurrentLine.FirstNonSpaceIndex();
-                            j = CurrentLine.FirstSpaceIndex(i);
-                            if (j != kNotFound) {
-                                k = CurrentLine.FirstNonSpaceIndex(j);
-                                if (k != kNotFound) { // could have dimensions
-                                    saveSpecExpected = fState.totalSpeciesExpected = CurrentLine.Cut(i,j-1L).to_long();
-                                    fState.totalSitesExpected=CurrentLine.Cut(k, kStringEnd).to_long();
-                                }
-                                if (CurrentLine.Find ('I', k, kStringDirectionBackward)>=0) { // interleaved
-                                    fState.interleaved = true;
-                                }
+                    c = CurrentLine.FirstNonSpace();
+                    while (1) {
+                        if (fState.acceptingCommands) {
+                            if (c == '$') { // command line
+                                processCommand(&CurrentLine, &fState);
+                                break;
                             }
-                        } else
-                            // now for the data crunching part
-                            // detect a line, diagnose it and dispatch accordingly
-                        {
-                            if (fState.interleaved) {
-                                if (fState.totalSpeciesRead<fState.totalSpeciesExpected) {
-                                    TrimPhylipLine (CurrentLine, (*result));
-                                }
-                                if (fState.curSite && fState.curSpecies >= saveSpecExpected &&
-                                    fState.totalSitesRead >= fState.totalSitesExpected) {
-                                    // reached the end of the data - see maybe there is a tree
-                                    ReadNextLine (f,&CurrentLine,&fState);
-                                    if (CurrentLine.nonempty()) {
-                                        if (CurrentLine.FirstNonSpace()=='(') { // could be a tree string
-                                            ProcessTree (&fState,f, CurrentLine);
-                                        }
+                        }
+                        
+                        if (!fState.skip) {
+                            fState.skip = fState.translationTable->GetSkipChar();
+                        }
+                        fState.acceptingCommands = FALSE;
+                        
+                        if (fState.fileType==-1) { // undecided file type - assume it is PHYLIP sequential
+                            if ((c == '#')||(c=='>')) { // hash-mark format
+                                fState.fileType = 0;
+                            } else { // assume this is a sequential PHYLIP file
+                                fState.fileType = 1;
+                                fState.interleaved = false;
+                            }
+                            
+                        }
+                        // decide what to do next
+                        // if format is PHYLIP and we do not know the expected dimensions,
+                        //   we must read those in first
+                        if (fState.fileType==1) { // PHYLIP
+                            if ((filePosition<0)&&(fState.autoDetect)) {
+                                filePosition = (f?
+                                                ftell (f)
+    #ifdef __WINDOZE__
+                                                -1
+    #endif
+                                                :fState.pInSrc);
+                                savedLine = CurrentLine;
+                            }
+                            
+                            if (fState.totalSitesExpected==0 || fState.totalSpeciesExpected==0) { // must read dimensions first
+                                i = CurrentLine.FirstNonSpaceIndex();
+                                j = CurrentLine.FirstSpaceIndex(i);
+                                if (j != kNotFound) {
+                                    k = CurrentLine.FirstNonSpaceIndex(j);
+                                    if (k != kNotFound) { // could have dimensions
+                                        saveSpecExpected = fState.totalSpeciesExpected = CurrentLine.Cut(i,j-1L).to_long();
+                                        fState.totalSitesExpected=CurrentLine.Cut(k, kStringEnd).to_long();
                                     }
-                                    break;
-                                }
-                                
-                            } else {
-                                if (fState.totalSitesRead > fState.totalSitesExpected)
-                                    // oops - autodetect incorrectly assumed that the file was sequential
-                                {
-                                    fState.curSpecies =
-                                    fState.totalSpeciesRead =
-                                    fState.totalSitesRead =
-                                    fState.curSite =
-                                    fState.totalSpeciesExpected =
-                                    fState.totalSitesExpected =
-                                    fState.maxStringLength = 0;
-                                    fState.allSpeciesDefined = false;
-                                    fState.interleaved = true;
-                                    fState.autoDetect = true;
-                                    
-                                    if(f) {
-                                        fseek (f, filePosition, SEEK_SET);
-                                    } else {
-                                        fState.pInSrc = filePosition;
+                                    if (CurrentLine.Find ('I', k, kStringDirectionBackward)>=0) { // interleaved
+                                        fState.interleaved = true;
                                     }
-                                    
-                                    CurrentLine = savedLine;
-                                    result->ForEach ([] (BaseRef site, unsigned long) -> void {
-                                        ((_Site*)site)->TrimSpace();
-                                    });
-                                    
-                                    result->theNames.Clear();
-                                    result->theMap.Clear();
-                                    result->Clear();
-                                    result->theFrequencies.Clear();
-                                    if (result->dsh) {
-                                        result->dsh->incompletePatterns->Clear(false);
-                                        delete (result->dsh);
-                                        result->dsh = nil;
-                                    }
-                                    continue;
                                 }
-                                if (fState.totalSpeciesRead==0) {
-                                    fState.totalSpeciesExpected = 1;
-                                    if (!fState.curSite) {
+                            } else
+                                // now for the data crunching part
+                                // detect a line, diagnose it and dispatch accordingly
+                            {
+                                if (fState.interleaved) {
+                                    if (fState.totalSpeciesRead<fState.totalSpeciesExpected) {
                                         TrimPhylipLine (CurrentLine, (*result));
                                     }
-                                }
-                                
-                                else if (fState.curSite>=fState.totalSitesExpected) {
-                                    fState.totalSpeciesExpected++;
-                                    if (fState.totalSpeciesExpected>saveSpecExpected) {
+                                    if (fState.curSite && fState.curSpecies >= saveSpecExpected &&
+                                        fState.totalSitesRead >= fState.totalSitesExpected) {
                                         // reached the end of the data - see maybe there is a tree
                                         ReadNextLine (f,&CurrentLine,&fState);
                                         if (CurrentLine.nonempty()) {
@@ -2169,161 +2119,223 @@ _DataSet* ReadDataSetFile (FILE*f, char execBF, _String* theS, _String* bfName, 
                                         }
                                         break;
                                     }
-                                    TrimPhylipLine (CurrentLine, (*result));
+                                    
+                                } else {
+                                    if (fState.totalSitesRead > fState.totalSitesExpected)
+                                        // oops - autodetect incorrectly assumed that the file was sequential
+                                    {
+                                        fState.curSpecies =
+                                        fState.totalSpeciesRead =
+                                        fState.totalSitesRead =
+                                        fState.curSite =
+                                        fState.totalSpeciesExpected =
+                                        fState.totalSitesExpected =
+                                        fState.maxStringLength = 0;
+                                        fState.allSpeciesDefined = false;
+                                        fState.interleaved = true;
+                                        fState.autoDetect = true;
+                                        
+                                        if(f) {
+                                            fseek (f, filePosition, SEEK_SET);
+                                        } else {
+                                            fState.pInSrc = filePosition;
+                                        }
+                                        
+                                        CurrentLine = savedLine;
+                                        result->ForEach ([] (BaseRef site, unsigned long) -> void {
+                                            ((_Site*)site)->TrimSpace();
+                                        });
+                                        
+                                        result->theNames.Clear();
+                                        result->theMap.Clear();
+                                        result->Clear();
+                                        result->theFrequencies.Clear();
+                                        if (result->dsh) {
+                                            result->dsh->incompletePatterns->Clear(false);
+                                            delete (result->dsh);
+                                            result->dsh = nil;
+                                        }
+                                        continue;
+                                    }
+                                    if (fState.totalSpeciesRead==0) {
+                                        fState.totalSpeciesExpected = 1;
+                                        if (!fState.curSite) {
+                                            TrimPhylipLine (CurrentLine, (*result));
+                                        }
+                                    }
+                                    
+                                    else if (fState.curSite>=fState.totalSitesExpected) {
+                                        fState.totalSpeciesExpected++;
+                                        if (fState.totalSpeciesExpected>saveSpecExpected) {
+                                            // reached the end of the data - see maybe there is a tree
+                                            ReadNextLine (f,&CurrentLine,&fState);
+                                            if (CurrentLine.nonempty()) {
+                                                if (CurrentLine.FirstNonSpace()=='(') { // could be a tree string
+                                                    ProcessTree (&fState,f, CurrentLine);
+                                                }
+                                            }
+                                            break;
+                                        }
+                                        TrimPhylipLine (CurrentLine, (*result));
+                                    }
                                 }
+                                
+                                ISelector (fState, CurrentLine, (*result));
                             }
-                            
-                            ISelector (fState, CurrentLine, (*result));
-                        }
-                        break;
-                    }
-                    // that's all for PHYLIP
-                    
-                    // now handle raw data case
-                    if (fState.fileType == 2) { // raw data
-                        FilterRawString(CurrentLine, &fState, (*result));
-                        if (CurrentLine.nonempty()) {
                             break;
                         }
-                        if (ProcessLine (CurrentLine, &fState, (*result))) {
-                            fState.curSpecies++;
-                            fState.totalSpeciesRead++;
-                        }
-                        break;
-                    }
-                    
-                    // lastly, handle the auto-detect standard case
-                    
-                    // check to see if the string defines a name
-                    if (c=='#' || c=='>') { // a name it is
-                        if (fState.allSpeciesDefined) { // can't define the species after data
+                        // that's all for PHYLIP
+                        
+                        // now handle raw data case
+                        if (fState.fileType == 2) { // raw data
+                            FilterRawString(CurrentLine, &fState, (*result));
+                            if (CurrentLine.nonempty()) {
+                                break;
+                            }
+                            if (ProcessLine (CurrentLine, &fState, (*result))) {
+                                fState.curSpecies++;
+                                fState.totalSpeciesRead++;
+                            }
                             break;
-                        } else {
-                            if ((!fState.totalSpeciesRead)&&(fState.totalSpeciesExpected>=1)) {
-                                fState.interleaved = TRUE;
+                        }
+                        
+                        // lastly, handle the auto-detect standard case
+                        
+                        // check to see if the string defines a name
+                        if (c=='#' || c=='>') { // a name it is
+                            if (fState.allSpeciesDefined) { // can't define the species after data
+                                break;
                             } else {
-                                fState.interleaved = FALSE;
+                                if ((!fState.totalSpeciesRead)&&(fState.totalSpeciesExpected>=1)) {
+                                    fState.interleaved = TRUE;
+                                } else {
+                                    fState.interleaved = FALSE;
+                                }
+                                fState.totalSpeciesExpected++;
+                                CurrentLine.Trim(CurrentLine.FirstNonSpaceIndex(1),kStringEnd);
+                                if (CurrentLine.char_at(0) == '#' || CurrentLine.char_at(0) == '>') {
+                                    CurrentLine = kDefSeqNamePrefix &_String(fState.totalSpeciesExpected);
+                                }
+                                result->AddName (CurrentLine);
                             }
-                            fState.totalSpeciesExpected++;
-                            CurrentLine.Trim(CurrentLine.FirstNonSpaceIndex(1),kStringEnd);
-                            if (CurrentLine.char_at(0) == '#' || CurrentLine.char_at(0) == '>') {
-                                CurrentLine = kDefSeqNamePrefix &_String(fState.totalSpeciesExpected);
-                            }
-                            result->AddName (CurrentLine);
+                            break;
                         }
+                        // check to see if the string defines a tree
+                        if (c=='(') {
+                            ProcessTree (&fState,f, CurrentLine);
+                            ReadNextLine (f,&CurrentLine,&fState);
+                        }
+                        
+                        // check to see where to stick the incoming line
+                        
+                        if (fState.totalSpeciesExpected == 0) {
+                            // raw data fed before names defined - skip
+                            break;
+                        }
+                        if( fState.totalSpeciesExpected>1 && fState.totalSpeciesRead == 0) {
+                            fState.allSpeciesDefined = TRUE;
+                        }
+                        
+                        // repeat the structure of PHYLIP reader
+                        
+                        ISelector (fState, CurrentLine, (*result));
+                        
                         break;
                     }
-                    // check to see if the string defines a tree
-                    if (c=='(') {
-                        ProcessTree (&fState,f, CurrentLine);
-                        ReadNextLine (f,&CurrentLine,&fState);
-                    }
                     
-                    // check to see where to stick the incoming line
+                    ReadNextLine (f,&CurrentLine,&fState);
                     
-                    if (fState.totalSpeciesExpected == 0) {
-                        // raw data fed before names defined - skip
-                        break;
-                    }
-                    if( fState.totalSpeciesExpected>1 && fState.totalSpeciesRead == 0) {
-                        fState.allSpeciesDefined = TRUE;
-                    }
-                    
-                    // repeat the structure of PHYLIP reader
-                    
-                    ISelector (fState, CurrentLine, (*result));
-                    
-                    break;
                 }
-                
-                ReadNextLine (f,&CurrentLine,&fState);
-                
             }
         }
-    }
-    
-    
-    
-    if (fState.totalSitesRead && fState.interleaved && !result->InternalStorageMode()) {
-        for (long i = fState.curSite; i<fState.totalSitesRead; i++) {
-            result->Compact(i);
-        }
-        result->ResetIHelper();
-    }
-    
-    if ((!fState.interleaved)&&(fState.fileType!=2)) {
-        PadLine (fState, (*result));
-    }
-    
-    
-    
-    // make sure interleaved duplications are handled correctly
-    
-    result->Finalize();
-    result->noOfSpecies       = fState.totalSpeciesRead;
-    result->theTT             = fState.translationTable;
-    
-    // check to see if result may be an amino-acid data
-    if (doAlphaConsistencyCheck && result->theTT == &hy_default_translation_table) {
-        if (result->GetNoTypes() == 0)
-            // emptyString data set
-            // try binary data
-        {
-            _TranslationTable *trialTable = new _TranslationTable (hy_default_translation_table);
-            trialTable->baseLength = 2;
-            _DataSet * res2 = ReadDataSetFile (f, execBF, theS, bfName, namespaceID, trialTable);
-            if (res2->GetNoTypes()) {
-                DeleteObject (result);
-                return res2;
-            }
-            DeleteObject (trialTable);
-        } else
-            // check it out
-            if (result->CheckAlphabetConsistency()<0.5)
-                // less than 50% of the data in the alphabet is not in the basic alphabet
-            {
-                _TranslationTable trialTable (hy_default_translation_table);
-                trialTable.baseLength = 20;
-                (*result).theTT = &trialTable;
-                if ((*result).CheckAlphabetConsistency()<0.5) {
-                    CurrentLine = "More than 50% of characters in the data are not in the alphabet.";
-                    (*result).theTT =  &hy_default_translation_table;
-                    ReportWarning (CurrentLine);
-                } else {
-                    (*result).theTT = (_TranslationTable*)trialTable.makeDynamic();
-                }
-                
-            }
         
-    }
-    if (nexusBFBody.nonempty()) {
-        if (execBF == 1) {
-            lastNexusDataMatrix = result;
-            
-            long            bfl = GetBFFunctionCount ();
-            
-            _ExecutionList * nexusBF = ex ? ex :  new _ExecutionList;
-            if (namespaceID) {
-                nexusBF->SetNameSpace(*namespaceID);
+        
+        
+        if (fState.totalSitesRead && fState.interleaved && !result->InternalStorageMode()) {
+            for (long i = fState.curSite; i<fState.totalSitesRead; i++) {
+                result->Compact(i);
             }
-            nexusBF->BuildList(nexusBFBody, nil, false, true);
-            //_ExecutionList nexusBF (nexusBFBody,namespaceID);
-            if (bfName) {
-                nexusBF->sourceFile = *bfName;
-            }
-
-            nexusBF->ExecuteAndClean(bfl);
-
-            if (nexusBF != ex) {
-                DeleteObject (nexusBF);
-            } else {
-                ex->ClearExecutionList();
-                ex->Clear();
-            }
-            nexusBFBody         = kEmptyString;
-        } else if (execBF == 0) {
-            nexusBFBody         = kEmptyString;
+            result->ResetIHelper();
         }
+        
+        if ((!fState.interleaved)&&(fState.fileType!=2)) {
+            PadLine (fState, (*result));
+        }
+        
+        
+        
+        // make sure interleaved duplications are handled correctly
+        
+        result->Finalize();
+        result->noOfSpecies       = fState.totalSpeciesRead;
+        result->theTT             = fState.translationTable;
+        
+        // check to see if result may be an amino-acid data
+        if (doAlphaConsistencyCheck && result->theTT == &hy_default_translation_table) {
+            if (result->GetNoTypes() == 0)
+                // emptyString data set
+                // try binary data
+            {
+                _TranslationTable *trialTable = new _TranslationTable (hy_default_translation_table);
+                trialTable->baseLength = 2;
+                _DataSet * res2 = ReadDataSetFile (f, execBF, theS, bfName, namespaceID, trialTable);
+                if (res2->GetNoTypes()) {
+                    DeleteObject (result);
+                    return res2;
+                }
+                DeleteObject (res2);
+            } else
+                // check it out
+                if (result->CheckAlphabetConsistency()<0.5)
+                    // less than 50% of the data in the alphabet is not in the basic alphabet
+                {
+                    _TranslationTable trialTable (hy_default_translation_table);
+                    trialTable.baseLength = 20;
+                    (*result).theTT = &trialTable;
+                    if ((*result).CheckAlphabetConsistency()<0.5) {
+                        CurrentLine = "More than 50% of characters in the data are not in the alphabet.";
+                        (*result).theTT =  &hy_default_translation_table;
+                        ReportWarning (CurrentLine);
+                    } else {
+                        (*result).theTT = (_TranslationTable*)trialTable.makeDynamic();
+                    }
+                    
+                }
+            
+        }
+        if (nexusBFBody.nonempty()) {
+            if (execBF == 1) {
+                lastNexusDataMatrix = result;
+                
+                long            bfl = GetBFFunctionCount ();
+                
+                _ExecutionList * nexusBF = ex ? ex :  new _ExecutionList;
+                if (namespaceID) {
+                    nexusBF->SetNameSpace(*namespaceID);
+                }
+                nexusBF->BuildList(nexusBFBody, nil, false, true);
+                //_ExecutionList nexusBF (nexusBFBody,namespaceID);
+                if (bfName) {
+                    nexusBF->sourceFile = *bfName;
+                }
+
+                nexusBF->ExecuteAndClean(bfl);
+
+                if (nexusBF != ex) {
+                    DeleteObject (nexusBF);
+                } else {
+                    ex->ClearExecutionList();
+                    ex->Clear();
+                }
+                nexusBFBody         = kEmptyString;
+            } else if (execBF == 0) {
+                nexusBFBody         = kEmptyString;
+            }
+        }
+    } catch (const _String err) {
+        DeleteObject (result);
+        HandleApplicationError(err);
+        result = nil;
     }
     
     return result;

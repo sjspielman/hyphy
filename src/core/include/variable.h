@@ -94,6 +94,10 @@ public:
       return varFormula;
     }
 
+    
+    void *      operator new       (size_t size);
+    void        operator delete    (void * p);
+
     virtual     bool        HasChanged      (bool = false);
     virtual     void        PreMarkChanged  ();
     virtual     void        PostMarkChanged ();
@@ -104,9 +108,8 @@ public:
         return false;
     }
 
-    virtual unsigned long        ObjectClass (void) const {
-        return varValue?varValue->ObjectClass():((varFormula&&varFormula->theFormula.lLength)?varFormula->ObjectClass():1);
-    }
+    virtual unsigned long        ObjectClass (void) const;
+    
     void        SetIndex (long i) {
         theIndex = i;
     }

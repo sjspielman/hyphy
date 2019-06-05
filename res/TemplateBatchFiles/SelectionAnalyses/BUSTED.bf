@@ -21,8 +21,15 @@ utility.SetEnvVariable ("LF_SMOOTHING_SCALER", 0.1);
 
 
 busted.analysis_description = {
-                               terms.io.info : "BUSTED (branch-site unrestricted statistical test of episodic diversification) uses a random effects branch-site model fitted jointly to all or a subset of tree branches in order to test for alignment-wide evidence of episodic diversifying selection. Assuming there is evidence of positive selection (i.e. there is an omega > 1), BUSTED will also perform a quick evidence-ratio style analysis to explore which individual sites may have been subject to selection. v2.0 adds support for synonymous rate variation, and relaxes the test statistic to 0.5 (chi^2_0 + chi^2_2). Version 2.1 adds a grid search for the initial starting point",
-                               terms.io.version : "2.1",
+                               terms.io.info : 
+"BUSTED (branch-site unrestricted statistical test of episodic diversification) uses a random effects branch-site model fitted 
+jointly to all or a subset of tree branches in order to test for alignment-wide evidence of episodic diversifying selection. 
+Assuming there is evidence of positive selection (i.e. there is an omega > 1),  BUSTED will also perform a quick evidence-ratio 
+style analysis to explore which individual sites may have been subject to selection. v2.0 adds support for synonymous rate variation, 
+and relaxes the test statistic to 0.5 (chi^2_0 + chi^2_2). Version 2.1 adds a grid search for the initial starting point.
+Version 2.2 changes the grid search to LHC, and adds an initial search phase to use adaptive Nedler-Mead.
+",
+                               terms.io.version : "2.2",
                                terms.io.reference : "*Gene-wide identification of episodic selection*, Mol Biol Evol. 32(5):1365-71",
                                terms.io.authors : "Sergei L Kosakovsky Pond",
                                terms.io.contact : "spond@temple.edu",
@@ -45,6 +52,8 @@ busted.json.site_logl  = "Site Log Likelihood";
 busted.json.evidence_ratios  = "Evidence Ratios";
 busted.rate_classes = 3;
 busted.synonymous_rate_classes = 3;
+busted.initial_grid.N = 250;
+
 
 busted.json    = { terms.json.analysis: busted.analysis_description,
                    terms.json.input: {},
@@ -87,8 +96,10 @@ KeywordArgument ("tree",      "A phylogenetic tree (optionally annotated with {}
     
 KeywordArgument ("branches",  "Branches to test", "All");
 KeywordArgument ("srv", "Include synonymous rate variation in the model", "Yes");
-
-
+KeywordArgument ("rates", "The number omega rate classes to include in the model [1-10, default 3]", busted.rate_classes);
+KeywordArgument ("syn-rates", "The number alpha rate classes to include in the model [1-10, default 3]", busted.synonymous_rate_classes);
+KeywordArgument ("grid-size", "The number of points in the initial distributional guess for likelihood fitting", 250);
+KeywordArgument ("starting-points", "The number of initial random guesses to seed rate values optimization", 1);
 
 namespace busted {
     LoadFunctionLibrary ("modules/shared-load-file.bf");
@@ -100,9 +111,14 @@ busted.do_srv = io.SelectAnOption ({"Yes" : "Allow synonymous substitution rates
                                     "No"  : "Synonymous substitution rates are constant across sites. This is the 'classic' behavior, i.e. the original published test"},
                                     "Synonymous rate variation"
                                     ) == "Yes";
+
+busted.rate_classes = io.PromptUser ("The number omega rate classes to include in the model", busted.rate_classes, 1, 10, TRUE);
+busted.synonymous_rate_classes = io.PromptUser ("The number omega rate classes to include in the model", busted.synonymous_rate_classes, 1, 10, TRUE);
+busted.initial_grid.N = io.PromptUser ("The number of points in the initial distributional guess for likelihood fitting", 250, 1, 10000, TRUE);
+busted.N.initial_guesses = io.PromptUser ("The number of initial random guesses to 'seed' rate values optimization", 1, 1, busted.initial_grid.N$10, TRUE);
                                     
 KeywordArgument ("output", "Write the resulting JSON to this file (default is to save to the same path as the alignment file + 'BUSTED.json')", busted.codon_data_info [terms.json.json]);
-busted.codon_data_info [terms.json.json] = io.PromptUserForString ("Save the resulting JSON file to");
+busted.codon_data_info [terms.json.json] = io.PromptUserForFilePath ("Save the resulting JSON file to");
     
 io.ReportProgressMessageMD('BUSTED',  'selector', 'Branches to test for selection in the BUSTED analysis');
 
@@ -147,7 +163,6 @@ busted.global_dnds = selection.io.extract_global_MLE_re (busted.final_partitione
 utility.ForEach (busted.global_dnds, "_value_", 'io.ReportProgressMessageMD ("BUSTED", "codon-refit", "* " + _value_[terms.description] + " = " + Format (_value_[terms.fit.MLE],8,4));');
 
 selection.io.stopTimer (busted.json [terms.json.timers], "Preliminary model fitting");
-
 
 //Store MG94 to JSON
 selection.io.json_store_lf_withEFV (busted.json,
@@ -207,7 +222,6 @@ if (busted.do_srv) {
 
 busted.distribution = models.codon.BS_REL.ExtractMixtureDistribution(busted.test.bsrel_model);
 
-
 // set up parameter constraints
 
 for (busted.i = 1; busted.i < busted.rate_classes; busted.i += 1) {
@@ -222,9 +236,8 @@ parameters.SetRange (model.generic.GetGlobalParameter (busted.test.bsrel_model ,
 busted.initial_grid = {};
 
 /* if populated, use this as a baseline to generate the distributions from */
-busted.initial_grid_presets = {"0" : 0.25};
-
-
+busted.initial_grid_presets = {"0" : 0.1};
+busted.initial_ranges = {};
 
 busted.init_grid_setup (busted.distribution);
 
@@ -233,8 +246,6 @@ busted.init_grid_setup (busted.distribution);
 PARAMETER_GROUPING = {};
 PARAMETER_GROUPING + busted.distribution["rates"];
 PARAMETER_GROUPING + busted.distribution["weights"];
-
-
 
 
 if (busted.has_background) {
@@ -258,8 +269,8 @@ if (busted.do_srv)  {
 
     
     busted.srv_distribution = {
-        'rates' : utility.Values (utility.Map (busted.srv_distribution [busted.srv_rate_regex ]  , "_value_", '((busted.test.bsrel_model[terms.parameters])[terms.global])[_value_]')),
-        'weights' : utility.Values (utility.Map (busted.srv_distribution [busted.srv_weight_regex ]  , "_value_", '((busted.test.bsrel_model[terms.parameters])[terms.global])[_value_]'))
+        'rates' : utility.UniqueValues (utility.Map (busted.srv_distribution [busted.srv_rate_regex ]  , "_value_", '((busted.test.bsrel_model[terms.parameters])[terms.global])[_value_]')),
+        'weights' : utility.UniqueValues (utility.Map (busted.srv_distribution [busted.srv_weight_regex ]  , "_value_", '((busted.test.bsrel_model[terms.parameters])[terms.global])[_value_]'))
     };
     
     PARAMETER_GROUPING + busted.srv_distribution["rates"];
@@ -270,10 +281,9 @@ if (busted.do_srv)  {
 }
 
 busted.initial.test_mean    = ((selection.io.extract_global_MLE_re (busted.final_partitioned_mg_results, "^" + terms.parameters.omega_ratio + ".+test.+"))["0"])[terms.fit.MLE];
-busted.initial_grid         = estimators.CreateInitialGrid (busted.initial_grid, 500, busted.initial_grid_presets);
+busted.initial_grid         = estimators.LHC (busted.initial_ranges,busted.initial_grid.N);
 
-
-
+//estimators.CreateInitialGrid (busted.initial_grid, busted.initial_grid.N, busted.initial_grid_presets);
 
 busted.initial_grid = utility.Map (busted.initial_grid, "_v_", 
     'busted._renormalize (_v_, "busted.distribution", busted.initial.test_mean)'
@@ -287,11 +297,9 @@ if (busted.has_background) { //GDD rate category
 }
 
 
-
 busted.model_map = {};
 
 for (busted.partition_index = 0; busted.partition_index < busted.partition_count; busted.partition_index += 1) {
-
     selection.io.json_store_branch_attribute(busted.json, terms.original_name, terms.json.node_label, 0,
                                              busted.partition_index,
                                              busted.name_mapping);
@@ -304,16 +312,45 @@ utility.SetEnvVariable ("ASSUME_REVERSIBLE_MODELS", TRUE);
 
 selection.io.startTimer (busted.json [terms.json.timers], "Unconstrained BUSTED model fitting", 2);
 
-
-
 io.ReportProgressMessageMD ("BUSTED", "main", "Performing the full (dN/dS > 1 allowed) branch-site model fit");
-busted.full_model =  estimators.FitLF (busted.filter_names, busted.trees, busted.model_map, busted.final_partitioned_mg_results, busted.model_object_map, {
+
+/** 
+    perform the initial fit using a constrained branch length model and 
+    a low precision Nedler-Mead algorithm pass to find good initial values 
+    for the rate distribution parameters
+*/
+
+ 
+busted.nm.precision = -0.00025*busted.final_partitioned_mg_results[terms.fit.log_likelihood];
+
+parameters.DeclareGlobalWithRanges ("busted.bl.scaler", 1, 0, 1000);
+busted.grid_search.results =  estimators.FitLF (busted.filter_names, busted.trees, busted.model_map, busted.final_partitioned_mg_results, busted.model_object_map, {
     "retain-lf-object": TRUE,
-    terms.search_grid : busted.initial_grid
+    terms.run_options.proportional_branch_length_scaler : 
+                                            {"0" : "busted.bl.scaler"},
+                                            
+    terms.run_options.optimization_settings : 
+        {
+            "OPTIMIZATION_METHOD" : "nedler-mead",
+            "MAXIMUM_OPTIMIZATION_ITERATIONS" : 500,
+            "OPTIMIZATION_PRECISION" : busted.nm.precision
+        } ,
+                                     
+    terms.search_grid     : busted.initial_grid,
+    terms.search_restarts : busted.N.initial_guesses
 });
+    
+busted.full_model =  estimators.FitLF (busted.filter_names, busted.trees, busted.model_map, busted.grid_search.results, busted.model_object_map, {
+        "retain-lf-object": TRUE,
+        terms.run_options.optimization_settings : 
+            {
+                "OPTIMIZATION_METHOD" : "hybrid"
+            } 
+                                    
+    });
 
-//io.SpoolLF(busted.full_model[utility.getGlobalValue("terms.likelihood_function")], "/Users/sergei/Desktop/BUSTED", "alt");
-
+KeywordArgument ("save-fit", "Save BUSTED model fit to this file (default is not to save)", "/dev/null");
+io.SpoolLFToPath(busted.full_model[terms.likelihood_function], io.PromptUserForFilePath ("Save BUSTED model fit to this file ['/dev/null' to skip]"));
 
 io.ReportProgressMessageMD("BUSTED", "main", "* " + selection.io.report_fit (busted.full_model, 9, busted.codon_data_info[terms.data.sample_size]));
 io.ReportProgressMessageMD("BUSTED", "main", "* For *test* branches, the following rate distribution for branch-site combinations was inferred");
@@ -512,11 +549,19 @@ function busted.init_grid_setup (omega_distro) {
                     }
                 }["_MATRIX_ELEMENT_VALUE_^(busted.rate_classes-_index_[0]-1)"];
                 busted.initial_grid_presets [_name_] = 0;
+                busted.initial_ranges [_name_] = {
+                    terms.lower_bound : 0,
+                    terms.upper_bound : 1
+                };
             }  else {
                 busted.initial_grid  [_name_] = {
                     {
                         1, 1.5, 2, 4, 10
                     }
+                };
+                busted.initial_ranges [_name_] = {
+                    terms.lower_bound : 1,
+                    terms.upper_bound : 10
                 };
                 busted.initial_grid_presets [_name_] = 2;
             }
@@ -532,6 +577,10 @@ function busted.init_grid_setup (omega_distro) {
                 }
             };
             busted.initial_grid_presets [_name_] = 3;
+            busted.initial_ranges [_name_] = {
+                terms.lower_bound : 0,
+                terms.upper_bound : 1
+            };
         '
     );
 

@@ -239,7 +239,7 @@ void _CalcNode::Clear (void) {
 //_______________________________________________________________________________________________
 
 _CalcNode::~_CalcNode (void) {
-    
+    Clear();
 }
 
 //_______________________________________________________________________________________________
@@ -457,7 +457,7 @@ bool        _CalcNode::NeedNewCategoryExponential(long catID) const {
         });
     } else {
         return !GetCompExp(catID) || categoryVariables.Any([&] (long cat_idx, unsigned long i) -> bool {
-            return ((_CategoryVariable*)LocateVar (cat_idx))->HaveParametersChanged(remapMyCategories.lData[catID*(categoryVariables.countitems()+1)+i+1]);
+            return ((_CategoryVariable*)LocateVar (cat_idx))->HaveParametersChanged(remapMyCategories.list_data[catID*(categoryVariables.countitems()+1)+i+1]);
         });
     }
     return false;
@@ -486,11 +486,11 @@ bool        _CalcNode::RecomputeMatrix  (long categID, long totalCategs, _Matrix
 
     /*
     for (unsigned long i=0; i<categoryVariables.lLength; i++) {
-        if (categoryIndexVars.lData[i]<0) {
+        if (categoryIndexVars.list_data[i]<0) {
             continue;
         }
-        curVar = LocateVar (categoryIndexVars.lData[i]);
-        locVar = LocateVar (categoryVariables.lData[i]);
+        curVar = LocateVar (categoryIndexVars.list_data[i]);
+        locVar = LocateVar (categoryVariables.list_data[i]);
         curVar->SetValue(locVar->Compute());
     } */
 
@@ -570,7 +570,7 @@ bool        _CalcNode::RecomputeMatrix  (long categID, long totalCategs, _Matrix
             #ifdef _UBER_VERBOSE_MX_UPDATE_DUMP
                 fprintf (stderr, "[_CalcNode::RecomputeMatrix] Setting category %ld/%ld for node %s\n", categID, totalCategs, GetName()->sData);
             #endif
-            SetCompExp ((_Matrix*)(isExplicitForm?temp:temp->Exponentiate()), totalCategs>1?categID:-1);
+            SetCompExp ((_Matrix*)(isExplicitForm?temp:temp->Exponentiate(1., true)), totalCategs>1?categID:-1);
 
         } else {
             compExp = (_Matrix*)myModelMatrix->Evaluate(false);
@@ -584,7 +584,7 @@ void        _CalcNode::SetCompExp  (_Matrix* m, long catID) {
     compExp = m;
     if (catID >= 0 && matrixCache) {
         if (remapMyCategories.lLength) {
-            catID = remapMyCategories.lData[catID*(categoryVariables.lLength+1)];
+            catID = remapMyCategories.list_data[catID*(categoryVariables.lLength+1)];
         }
         matrixCache[catID] = compExp;
     }
@@ -613,7 +613,7 @@ _Matrix*    _CalcNode::GetCompExp       (long catID, bool doClear) const {
     } else {
 
         if (remapMyCategories.lLength) {
-            catID = remapMyCategories.lData[catID * (categoryVariables.lLength+1)];
+            catID = remapMyCategories.list_data[catID * (categoryVariables.lLength+1)];
         }
 
         _Matrix* ret = matrixCache?matrixCache[catID]:compExp;
@@ -684,30 +684,30 @@ void     _CalcNode::SetupCategoryMap (_List& containerVariables, _SimpleList& cl
            in variable myCatID changes the compositve index by "offset"
          */
         for (long myCatID = catCount-2L; myCatID >= 0L; myCatID--) {
-            rateMultiplers.lData[myCatID] = rateMultiplers.lData[myCatID+1]*classCounter.lData[remappedIDs.lData[myCatID+1]];
+            rateMultiplers.list_data[myCatID] = rateMultiplers.list_data[myCatID+1]*classCounter.list_data[remappedIDs.list_data[myCatID+1]];
         }
         
         for (long currentRateCombo  = 0L; currentRateCombo < totalCategories; currentRateCombo++) {
             long copyRateCombo = currentRateCombo;
             for (long variableID = 0L; variableID < globalCatCount; variableID++) {
-                categoryValues.lData[variableID] = copyRateCombo / multipliers.lData[variableID];
-                copyRateCombo = copyRateCombo%multipliers.lData[variableID];
-                //printf ("%d %d %d %d\n", currentRateCombo, variableID, multipliers.lData[variableID], categoryValues.lData[variableID]);
+                categoryValues.list_data[variableID] = copyRateCombo / multipliers.list_data[variableID];
+                copyRateCombo = copyRateCombo%multipliers.list_data[variableID];
+                //printf ("%d %d %d %d\n", currentRateCombo, variableID, multipliers.list_data[variableID], categoryValues.list_data[variableID]);
             }
             
             long localCatID = 0L;
             
             for  (long localVariableID = 0; localVariableID<catCount; localVariableID++) {
-                localCatID += rateMultiplers.lData[localVariableID] * categoryValues.lData[remappedIDs.lData[localVariableID]];
+                localCatID += rateMultiplers.list_data[localVariableID] * categoryValues.list_data[remappedIDs.list_data[localVariableID]];
             }
             
             long offset = currentRateCombo * entriesPerCat;
-            remapMyCategories.lData[offset] = localCatID;
+            remapMyCategories.list_data[offset] = localCatID;
             //printf ("[%ld] = %ld (%ld)\n", offset, localCatID, );
             
             offset++;
             for  (long localVariableID = 0; localVariableID<catCount; localVariableID++) {
-                remapMyCategories[offset++] = categoryValues.lData[remappedIDs.lData[localVariableID]];
+                remapMyCategories[offset++] = categoryValues.list_data[remappedIDs.list_data[localVariableID]];
             }
             
         }
@@ -822,9 +822,11 @@ _Formula*   _CalcNode::RecurseMC (long varToConstrain, node<long>* whereAmI, boo
     
     if (k==descendants-start) { // all underlying branches are "simple"
         for (long n=1; n<descendants-start; n++) {
+            //printf ("Setting simple constraint at %s %s\n", LocateVar(nodeConditions[n]->GetIthTerm(0)->GetAVariable())->GetName()->get_str(),
+            //        _String((_String*)nodeConditions[0]->toStr(kFormulaStringConversionNormal, nil, true)).get_str());
             LocateVar (nodeConditions[n]->GetIthTerm(0)->GetAVariable())->SetFormula (*nodeConditions[0]);
             delete (nodeConditions[n]);
-            nodeConditions[k] = nil;
+            nodeConditions[n] = nil;
         }
         k = 0;
     } else {
@@ -839,6 +841,9 @@ _Formula*   _CalcNode::RecurseMC (long varToConstrain, node<long>* whereAmI, boo
                 if (n==k) {
                     continue;
                 }
+                //printf ("Setting semi-simple constraint at %s : %s\n", LocateVar(nodeConditions[n]->GetIthTerm(0)->GetAVariable())->GetName()->get_str(),
+                //                                                       _String((_String*)nodeConditions[k]->toStr(kFormulaStringConversionNormal, nil, true)).get_str());
+                
                 LocateVar (nodeConditions[n]->GetIthTerm(0)->GetAVariable())->SetFormula (*nodeConditions[k]);
                 delete (nodeConditions[n]);
                 nodeConditions[n] = nil;
@@ -850,6 +855,9 @@ _Formula*   _CalcNode::RecurseMC (long varToConstrain, node<long>* whereAmI, boo
                     continue;
                 }
                 if (nodeConditions[l]->Length()==1) {
+                    //printf ("Setting simple non-additive at %s %s\n", LocateVar(nodeConditions[l]->GetIthTerm(0)->GetAVariable())->GetName()->get_str(),
+                    //        _String((_String*)nodeConditions[k]->toStr(kFormulaStringConversionNormal, nil, true)).get_str());
+                    
                     LocateVar (nodeConditions[l]->GetIthTerm(0)->GetAVariable())->SetFormula (*nodeConditions[k]);
                 } else { // solve for a non-additive constraint
                     _Variable* nonAdd = LocateVar (nodeConditions[l]->GetIthTerm(0)->GetAVariable());
@@ -859,7 +867,7 @@ _Formula*   _CalcNode::RecurseMC (long varToConstrain, node<long>* whereAmI, boo
                     for (long m=0; m<nodeConditions[l]->GetList().lLength; m++) {
                         _Operation* curOp = (_Operation*)(*nodeConditions[l]).GetList()(m);
                         if (curOp->GetNoTerms()) {
-                            newConstraint.GetList().AppendNewInstance(new _Operation ('-', 2L));
+                            newConstraint.GetList().AppendNewInstance(new _Operation (HY_OP_CODE_SUB, 2L));
                         } else {
                             newConstraint.GetList()<<curOp;
                         }
@@ -867,6 +875,8 @@ _Formula*   _CalcNode::RecurseMC (long varToConstrain, node<long>* whereAmI, boo
                     delete (nodeConditions[l]);
                     nodeConditions[l] = nil;
                     nonAdd->SetFormula(newConstraint);
+                    //printf ("Setting complex non-additive at %s %s\n", nonAdd->GetName()->get_str(),
+                    //        _String((_String*)newConstraint.toStr(kFormulaStringConversionNormal, nil, true)).get_str());
                 }
             }
     }
@@ -874,14 +884,10 @@ _Formula*   _CalcNode::RecurseMC (long varToConstrain, node<long>* whereAmI, boo
     
     if(!first) {
         _Formula     *result = nodeConditions[k];
-        
         _Operation   *newVar = new _Operation;
-        
-        newVar->SetAVariable (iVariables->lData[f-1]);
-        
+        newVar->SetAVariable (iVariables->list_data[f-1]);
         result->GetList().AppendNewInstance( newVar);
-        result->GetList().AppendNewInstance(new _Operation ('+', 2L));
-        
+        result->GetList().AppendNewInstance(new _Operation (HY_OP_CODE_ADD, 2L));
         
         delete [] nodeConditions;
         return result;

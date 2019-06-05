@@ -47,13 +47,18 @@
 
 #if defined   __UNIX__ 
     #include <unistd.h>
+    #include <sys/stat.h>
+    #include <sys/types.h>
     #if !defined __MINGW32__
-    #include <sys/utsname.h>
+        #include <sys/utsname.h>
     #endif
 #endif
 
 #include <time.h>
 #include <float.h>
+#include <signal.h>
+#include <stdlib.h>
+
 
 using     namespace hy_env;
 
@@ -114,19 +119,7 @@ namespace hy_global {
                      kErrorStringDatasetRefIndexError ("Dataset index reference out of range"),
                      kErrorStringMatrixExportError    ("Export matrix called with a non-polynomial matrix argument"),
                      kErrorStringNullOperand          ("Attempting to operate on an undefined value; this is probably the result of an earlier 'soft' error condition"),
-                      kHyPhyVersion  = _String ("2.4.0.") & _String(__DATE__).Cut (7,10) & _String(__DATE__).Cut (0,2).Replace("Jan", "01", true).
-                                      Replace("Feb", "02", true).
-                                      Replace("Mar", "03", true).
-                                      Replace("Apr", "04", true).
-                                      Replace("May", "05", true).
-                                      Replace("Jun", "06", true).
-                                      Replace("Jul", "07", true).
-                                      Replace("Aug", "08", true).
-                                      Replace("Sep", "09", true).
-                                      Replace("Oct", "10", true).
-                                      Replace("Nov", "11", true).
-                                      Replace("Dec", "12", true)
-                                        & _String(__DATE__).Cut (4,5).Replace (" ", "0", true) & "alpha",
+                      kHyPhyVersion  = _String ("2.5.0"),
     
                     kNoneToken = "None",
                     kNullToken = "null",
@@ -167,16 +160,27 @@ namespace hy_global {
   
   
     int _reg_exp_err_code = 0;
-    regex_t * hy_float_regex                 = _String::PrepRegExp ("\\ *[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?", _reg_exp_err_code, true),
+    regex_t * hy_float_regex                 = _String::PrepRegExp ("^\\ *[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?", _reg_exp_err_code, true),
             * hy_replicate_constraint_regexp = _String::PrepRegExp ("^this([0-9]+)\\.(.+)$", _reg_exp_err_code, true);
   
   
 
     //____________________________________________________________________________________
   
-    hyPointer MemAllocate (long bytes, bool zero) {
+    hyPointer MemAllocate (long bytes, bool zero, size_t alignment) {
+        hyPointer result = nil;
         
-        hyPointer result = (hyPointer) zero ? calloc (bytes, 1) : malloc (bytes);
+//#ifdef _ISOC11_SOURCE
+        if (alignment > 0 && bytes >= alignment && bytes % alignment == 0) {
+            if (posix_memalign (&result, alignment, bytes) == 0) {
+                if (zero) {
+                    memset (result, 0, bytes);
+                }
+                return result;
+            }
+        }
+//#endif
+        result = (hyPointer) zero ? calloc (bytes, 1) : malloc (bytes);
         
         if (result == nil) {
             HandleApplicationError (_String ("Failed to allocate '")  & bytes & "' bytes'", true);
@@ -273,7 +277,6 @@ namespace hy_global {
         _hy_standard_library_paths.AppendNewInstance      (new _String(hy_lib_directory & hy_standard_library_directory & dd ));
         _hy_standard_library_paths.AppendNewInstance      (new _String(hy_lib_directory & hy_standard_library_directory & dd & hy_standard_model_directory & dd ));
         _hy_standard_library_paths.AppendNewInstance      (new _String(hy_lib_directory & hy_standard_library_directory & dd & "Utility" & dd));
-        _hy_standard_library_paths.AppendNewInstance      (new _String(hy_lib_directory & "UserAddIns" & dd));
         _hy_standard_library_paths.AppendNewInstance      (new _String(hy_lib_directory & hy_standard_library_directory & dd & "Distances" & dd));
         
         const char * extensions [] = {"", ".bf", ".ibf", ".def", ".mdl"};
@@ -329,6 +332,10 @@ namespace hy_global {
             lastMatrixDeclared = -1;
             variableNames.Clear(true);
             _hy_application_globals.Clear(true);
+            bgmList.Clear();
+            scfgList.Clear();
+            bgmNamesList.Clear();
+            scfgNamesList.Clear();
             
             hy_x_variable = nil;
             hy_n_variable = nil;
@@ -357,20 +364,28 @@ namespace hy_global {
        
         init_genrand            (hy_random_seed);
         EnvVariableSet(random_seed, new _Constant (hy_random_seed), false);
-        has_terminal_stdout = isatty (STDOUT_FILENO);
-        has_terminal_stderr = isatty (STDERR_FILENO);
         
+        _Constant::free_slots.Populate ((long)_HY_CONSTANT_PREALLOCATE_SLOTS, (long)_HY_CONSTANT_PREALLOCATE_SLOTS-1, -1L);
+        _StringBuffer::free_slots.Populate ((long)_HY_STRING_BUFFER_PREALLOCATE_SLOTS, (long)_HY_STRING_BUFFER_PREALLOCATE_SLOTS-1, -1L);
 
         
 #ifdef __HYPHYMPI__
         hy_env :: EnvVariableSet (hy_env::mpi_node_id, new _Constant (hy_mpi_node_rank), false);
         hy_env :: EnvVariableSet (hy_env::mpi_node_count, new _Constant (hy_mpi_node_count), false);
+        has_terminal_stdout = false;
+        has_terminal_stderr = false;
+ #else
+        has_terminal_stdout = isatty (STDOUT_FILENO);
+        has_terminal_stderr = isatty (STDERR_FILENO);
 #endif
 
 #if not defined (__HYPHY_MPI_MESSAGE_LOGGING__) && defined (__HYPHYMPI__)
         if (hy_mpi_node_rank == 0L) {
+            struct stat sb;
+            fstat (STDERR_FILENO, &sb);
+            has_terminal_stderr = (sb.st_mode & S_IFMT) == S_IFIFO;
 #endif
-            
+        
             
 #ifndef __HEADLESS__ // do not create log files for _HEADLESS_
             _String * prefix [2] = {&hy_error_log_name, &hy_messages_log_name};
@@ -490,6 +505,12 @@ namespace hy_global {
             }
         }
         
+        /*if (_Constant::preallocated_buffer) {
+            free ((void*)_Constant::preallocated_buffer);
+        }
+        if (_StringBuffer::preallocated_buffer) {
+            free ((void*)_StringBuffer::preallocated_buffer);
+        }*/
         return no_errors;
     }
     
@@ -676,7 +697,7 @@ namespace hy_global {
     }
   
     //____________________________________________________________________________________
-    void HandleApplicationError (const _String & message, bool force_exit) {
+    void HandleApplicationError (const _String & message, bool force_exit, bool dump_core) {
 
         if (!force_exit && currentExecutionList && currentExecutionList->errorHandlingMode == HY_BL_ERROR_HANDLING_SOFT) {
             currentExecutionList->ReportAnExecutionError(message, true);
@@ -735,7 +756,11 @@ namespace hy_global {
 #ifdef _HY_ABORT_ON_ERROR
             abort ();
 #else
+        if (dump_core) {
+            raise (SIGTERM);
+        } else {
             exit(1);
+        }
 #endif
     }
   
@@ -782,9 +807,11 @@ namespace hy_global {
   }
   
   //____________________________________________________________________________________
-  bool    ProcessFileName (_String & path_name, bool isWrite, bool acceptStringVars, hyPointer theP, bool assume_platform_specific, _ExecutionList * caller, bool relative_to_base) {
+  bool    ProcessFileName (_String & path_name, bool isWrite, bool acceptStringVars, hyPointer theP, bool assume_platform_specific, _ExecutionList * caller, bool relative_to_base, bool relative_path_passthrough) {
+      
+    static  const _String kRelPathPrefix ("../");
     _String errMsg;
-    
+          
     try {
       if (path_name == kPromptForFilePlaceholder || path_name == kEmptyString) {
         // prompt user for file
@@ -853,20 +880,22 @@ namespace hy_global {
     }
     
     if (path_name.get_char(0) != '/') { // relative path
-      if (pathNames.lLength) {
+      if (pathNames.nonempty() && !relative_path_passthrough) {
+          
         _String*    lastPath = relative_to_base ? & hy_base_directory : (_String*)pathNames(pathNames.lLength-1);
 
         long        f = (long)lastPath->length ()-2L,
                     k = 0L;
         
         // check the last stored absolute path and reprocess this relative path into an absolute.
-        while (path_name.BeginsWith ("../")) {
+        while (path_name.BeginsWith (kRelPathPrefix)) {
           if ( (f = lastPath->FindBackwards('/',0,f)-1) == kNotFound) {
             return true;
           }
           path_name.Trim(3,-1);
           k++;
         }
+
         if (k==0L) {
           path_name = *lastPath & path_name;
         } else {
@@ -896,7 +925,7 @@ namespace hy_global {
     
     if (path_name.Find(':') == kNotFound && path_name.Find("\\\\",0,1) == kNotFound) { // relative path
       
-      if (pathNames.lLength) {
+      if (pathNames.nonempty () && !relative_path_passthrough) {
         _String*    lastPath = relative_to_base ? & hy_base_directory : (_String*)pathNames(pathNames.lLength-1);
         long f = (long)lastPath->length() - 2L, k = 0L;
         // check the last stored absolute path and reprocess this relative path into an absolute.

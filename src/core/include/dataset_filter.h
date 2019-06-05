@@ -52,6 +52,12 @@ enum _hy_dataset_filter_ambiguity_resolution {
   kAmbiguityHandlingSkip
 };
 
+enum _hy_dataset_filter_unique_match {
+  kUniqueMatchExact = 0L,
+  kUniqueMatchExactOrGap = 1L,
+  kUniqueMatchSuperset = 2L,
+  kUniqueMatchPartialMatch = 3L
+};
 
 class _DataSetFilter : public BaseObj {
 
@@ -155,7 +161,7 @@ public:
   void MatchStartNEnd(_SimpleList &, _SimpleList &, _SimpleList * = nil) const;
 
   _String *GetSequenceName(long idx) const {
-    return theData->GetSequenceName(theNodeMap.lData[idx]);
+    return theData->GetSequenceName(theNodeMap.get(idx));
   }
 
   _String *GetSequenceCharacters(long) const;
@@ -200,7 +206,7 @@ public:
   * @return The number of unique sequences.
   */
   unsigned long FindUniqueSequences(_SimpleList &indices, _SimpleList &map,
-                                    _SimpleList &counts, short mode = 0) const;
+                                    _SimpleList &counts,  _hy_dataset_filter_unique_match mode = kUniqueMatchExact) const;
 
   long CorrectCode(long code) const;
   virtual bool CompareTwoSites(unsigned long, unsigned long,
@@ -259,7 +265,7 @@ public:
   char const *GetColumn(long index) const {
     return (const char *)(*(_Site *)((
         (BaseRef *)
-            theData->lData)[theData->theMap.lData[theMap.lData[index]]]));
+            theData->list_data)[theData->theMap.list_data[theMap.list_data[index]]]));
   }
 
   _SimpleList conversionCache;

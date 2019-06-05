@@ -82,8 +82,7 @@ _CategoryVariable::_CategoryVariable (_String& name, _List* parms, _VariableCont
 }
 
 //___________________________________________________________________________________________
-bool _CategoryVariable::checkWeightMatrix(_Matrix& w, long row)
-{
+bool _CategoryVariable::checkWeightMatrix(_Matrix& w, long row) {
     bool    check = true;
     _Constant iterate;
     hyFloat sumCheck = 0;
@@ -101,7 +100,7 @@ bool _CategoryVariable::checkWeightMatrix(_Matrix& w, long row)
             }
         }
     } else {
-        for (long i=0; i<intervals; i++) {
+        for (long i=0L; i<intervals; i++) {
             sumCheck+=w.theData[i];
         }
         if (fabs(sumCheck-1.0)>=1e-8) {
@@ -243,11 +242,11 @@ void _CategoryVariable::Construct (_List& parameters, _VariableContainer *theP) 
                                 thisCell->ScanFForVariables (sv, true);
                                 sv.ReorderList();
                                 for (long v = 0; v < probVars.lLength; v++) {
-                                    long f = variableDependanceAllocations.Find ((BaseRef)probVars.lData[v]);
+                                    long f = variableDependanceAllocations.Find ((BaseRef)probVars.list_data[v]);
                                     if (f < 0) {
-                                        f = variableDependanceAllocations.Insert ((BaseRef)probVars.lData[v], (long)(new _SimpleList (intervals,0,0)),false);
+                                        f = variableDependanceAllocations.Insert ((BaseRef)probVars.list_data[v], (long)(new _SimpleList (intervals,0,0)),false);
                                     }
-                                    ((_SimpleList*) variableDependanceAllocations.GetXtra (f))->lData[k] = 1;
+                                    ((_SimpleList*) variableDependanceAllocations.GetXtra (f))->list_data[k] = 1;
                                 }
                             }
                         }
@@ -458,11 +457,11 @@ void _CategoryVariable::Construct (_List& parameters, _VariableContainer *theP) 
                             thisCell->ScanFForVariables (sv, true);
                             sv.ReorderList();
                             for (long v = 0; v < densityVars.lLength; v++) {
-                                long f = variableDependanceAllocations.Find ((BaseRef)densityVars.lData[v]);
+                                long f = variableDependanceAllocations.Find ((BaseRef)densityVars.list_data[v]);
                                 if (f < 0) {
-                                    f = variableDependanceAllocations.Insert ((BaseRef)densityVars.lData[v], (long)(new _SimpleList (intervals,0,0)),false);
+                                    f = variableDependanceAllocations.Insert ((BaseRef)densityVars.list_data[v], (long)(new _SimpleList (intervals,0,0)),false);
                                 }
-                                ((_SimpleList*) variableDependanceAllocations.GetXtra (f))->lData[k] = 1;
+                                ((_SimpleList*) variableDependanceAllocations.GetXtra (f))->list_data[k] = 1;
                             }
 
                             scannedVarsList.Union (densityVars,existingVars);
@@ -478,7 +477,7 @@ void _CategoryVariable::Construct (_List& parameters, _VariableContainer *theP) 
 
     // disallow category -> category dependance
     for (long i=0; i<scannedVarsList.lLength; i++) {
-        _Variable * curVar = (_Variable*)variablePtrs (scannedVarsList.lData[i]);
+        _Variable * curVar = (_Variable*)variablePtrs (scannedVarsList.list_data[i]);
         if (curVar->IsCategory()) {
             HandleApplicationError (errorMsg & _String("Can't create a category variable that depends on another category variable, ") & curVar->GetName()->Enquote());
             return;
@@ -554,16 +553,16 @@ void _CategoryVariable::Construct (_List& parameters, _VariableContainer *theP) 
     }
 
     for (long vid = 0; vid < parameterList.lLength; vid ++) {
-        long vf = variableDependanceAllocations.Find ((BaseRef)parameterList.lData[vid]);
+        long vf = variableDependanceAllocations.Find ((BaseRef)parameterList.list_data[vid]);
         if (vf >= 0) {
             affectedClasses << (_SimpleList*)(variableDependanceAllocations.GetXtra (vf));
-        } else if (exclude.Find (parameterList.lData[vid]) >= 0) {
+        } else if (exclude.Find (parameterList.list_data[vid]) >= 0) {
             affectedClasses.AppendNewInstance (new _SimpleList (intervals,0,0));
         } else {
             affectedClasses.AppendNewInstance (new _SimpleList (intervals,1,0));
         }
 
-        _String vlog = _String ("Variable ") & *LocateVar(parameterList.lData[vid])->GetName() & " mapped to class " & _String(((_String*)affectedClasses(vid)->toStr()));
+        _String vlog = _String ("Variable ") & *LocateVar(parameterList.list_data[vid])->GetName() & " mapped to class " & _String(((_String*)affectedClasses(vid)->toStr()));
         ReportWarning (vlog);
     }
 
@@ -743,6 +742,10 @@ hyFloat  _CategoryVariable::SetIntervalValue (long ival, bool recalc)
         newIntervalValue = ((_Matrix*)values->RetrieveNumeric())->theData[ival];
     }
     SetValue (new _Constant(newIntervalValue),false);
+    /*if (ival == 0) {
+        printf ("\n\n");
+    }
+    printf ("%ld => %g\n", ival, newIntervalValue);*/
     return newIntervalValue;
 }
 
@@ -864,32 +867,35 @@ _Matrix*    _CategoryVariable::GetIntervalEnds (void)
 }
 
 //___________________________________________________________________________________________
-_Matrix*    _CategoryVariable::ComputeHiddenMarkov (void)
-{
-    _Variable* theMX = LocateVar (modelMatrixIndices.lData[hiddenMarkovModel]);
-    return (_Matrix*)((_Matrix*)theMX->GetValue())->ComputeNumeric();
+_Matrix*    _CategoryVariable::ComputeHiddenMarkov (void) {
+    _Matrix *hmmr = (_Matrix*)((_Matrix*)LocateVar (modelMatrixIndices.list_data[hiddenMarkovModel])->GetValue())->ComputeNumeric();
+    if (!hmmr->IsValidTransitionMatrix()) {
+        HandleApplicationError(_String ("Hidden Markov Model transition matrix variable did not compute to a valid transition matrix"));
+    }
+    return hmmr;
 }
 
 //___________________________________________________________________________________________
 _Matrix*    _CategoryVariable::ComputeHiddenMarkovFreqs (void)
 {
-    long       fIndex = modelFrequenciesIndices.lData[hiddenMarkovModel];
+    long       fIndex = modelFrequenciesIndices.list_data[hiddenMarkovModel];
     if (fIndex<0) {
         fIndex = -fIndex-1;
     }
-    _Variable* theMX = LocateVar (fIndex);
-    return (_Matrix*)((_Matrix*)theMX->GetValue())->ComputeNumeric();
+    _Matrix * hmmf = (_Matrix*)((_Matrix*)LocateVar (fIndex)->GetValue())->ComputeNumeric();
+    checkWeightMatrix(*hmmf);
+    return hmmf;
 }
 
 //___________________________________________________________________________________________
 _Matrix*    _CategoryVariable::GetHiddenMarkov (void) const {
-    _Variable* theMX = LocateVar (modelMatrixIndices.lData[hiddenMarkovModel]);
+    _Variable* theMX = LocateVar (modelMatrixIndices.list_data[hiddenMarkovModel]);
     return (_Matrix*)theMX->GetValue();
 }
 
 //___________________________________________________________________________________________
 _Matrix*    _CategoryVariable::GetHiddenMarkovFreqs (void) const {
-    long       fIndex = modelFrequenciesIndices.lData[hiddenMarkovModel];
+    long       fIndex = modelFrequenciesIndices.list_data[hiddenMarkovModel];
     if (fIndex<0) {
         fIndex = -fIndex-1;
     }
@@ -898,16 +904,19 @@ _Matrix*    _CategoryVariable::GetHiddenMarkovFreqs (void) const {
 }
 
 //___________________________________________________________________________________________
-bool    _CategoryVariable::HaveParametersChanged (long catID)
-{
-    for (unsigned long i=0; i<parameterList.lLength; i++) {
-        _Variable * p = LocateVar(parameterList.lData[i]);
+bool    _CategoryVariable::HaveParametersChanged (long catID) {
+    for (unsigned long i=0UL; i < parameterList.lLength; i++) {
+        _Variable * p = LocateVar(parameterList.list_data[i]);
         if (p->HasChanged())
-            if (catID == -1 || ((_SimpleList**)affectedClasses.lData)[i]->lData[catID]) {
+            if (catID == -1 || ((_SimpleList**)affectedClasses.list_data)[i]->list_data[catID]) {
                 return true;
             }
     }
 
+    if (catID == -1 && is_hidden_markov()) {
+        return GetHiddenMarkov()->HasChanged() || GetHiddenMarkovFreqs() -> HasChanged();
+    }
+    
     return false;
 }
 
@@ -915,7 +924,7 @@ bool    _CategoryVariable::HaveParametersChanged (long catID)
 bool    _CategoryVariable::IsConstant (void)
 {
     for (unsigned long i=0; i<parameterList.lLength; i++)
-        if (LocateVar(parameterList.lData[i])->IsConstant() == false) {
+        if (LocateVar(parameterList.list_data[i])->IsConstant() == false) {
             return false;
         }
 
@@ -968,11 +977,11 @@ void      _CategoryVariable::ScanForGVariables (_AVLList& l)
     long xi = hy_x_variable->get_index();
 
     for (long i=0; i<temp.lLength; i++) {
-        if (temp.lData[i]!=xi) {
-            _Variable* theV = LocateVar(temp.lData[i]);
+        if (temp.list_data[i]!=xi) {
+            _Variable* theV = LocateVar(temp.list_data[i]);
 
             if (theV->IsGlobal()&& theV->IsIndependent()) {
-                l.Insert ((BaseRef)temp.lData[i]);
+                l.Insert ((BaseRef)temp.list_data[i]);
             }
         }
     }

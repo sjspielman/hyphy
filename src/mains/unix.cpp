@@ -33,6 +33,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #include "global_things.h"
 #include "function_templates.h"
+#include "trie_iterator.h"
 
 using namespace hy_global;
 
@@ -53,7 +54,7 @@ using namespace hy_global;
 
 
 const char hy_usage[] =
-"usage: HYPHYMP or HYPHYMPI [-h] "
+"usage: hyphy or HYPHYMPI [-h] [--help]"
 "[-c] "
 "[-d] "
 "[-i] "
@@ -62,42 +63,59 @@ const char hy_usage[] =
 "[CPU=integer] "
 "[LIBPATH=library path] "
 "[USEPATH=library path] "
-"[--keyword value ... ]"
-"[<analysis keyword> or <path to hyphy batch file> [--keyword value ... --keyword value] [positional arguments]"
+"[<standard analysis name> or <path to hyphy batch file>] [--keyword value ...] [positional arguments ...]"
 "\n";
 
 
+const char analysis_help_message [] =
+"Available analysis command line options\n"
+"---------------------------------------\n"
+"Use --option VALUE syntax to invoke\n"
+"If a [reqired] option is not provided on the command line, the analysis will prompt for its value\n"
+"[conditionally required] options may or not be required based on the values of other options\n\n";
+
 const char hy_help_message [] =
-"Execute a HyPhy analysis, either interactively, or in batch mode"
-"\n"
+"Execute a HyPhy analysis, either interactively, or in batch mode\n"
 "optional flags:\n"
-"  -h                       show this help message and exit\n"
+"  -h --help                show this help message and exit\n"
 "  -c                       calculator mode; causes HyPhy to drop into an expression evaluation until 'exit' is typed\n"
 "  -d                       debug mode; causes HyPhy to drop into an expression evaluation mode upon script error\n"
 "  -i                       interactive mode; causes HyPhy to always prompt the user for analysis options, even when defaults are available\n"
 "  -p                       postprocessor mode; drops HyPhy into an interactive mode where general post-processing scripts can be selected\n"
 "                           upon analysis completion\n\n"
 "optional global arguments:\n"
-"  BASEPATH=directory path  defines the base directory for all most path operations (default is pwd)\n"
+"  BASEPATH=directory path  defines the base directory for all path operations (default is pwd)\n"
 "  CPU=integer              if compiled with OpenMP multithreading support, requests this many threads; HyPhy could use fewer than this\n"
 "                           but never more; default is the number of CPU cores (as computed by OpenMP) on the system\n"
 "  LIBPATH=directory path   defines the directory where HyPhy library files are located (default installed location is /usr/local/lib/hyphy\n"
 "                           or as configured during CMake installation\n"
 "  USEPATH=directory path   specifies the optional working and relative path directory (default is BASEPATH)\n\n"
-"optional keyword arguments\n"
 "  batch file to run        if specified, execute this file, otherwise drop into an interactive mode\n"
 "  analysis arguments       if batch file is present, all remaining positional arguments are interpreted as inputs to analysis prompts\n\n"
 "optional keyword arguments (can appear anywhere); will be consumed by the requested analysis\n"
 "  --keyword value          will be passed to the analysis (which uses KeywordArgument directives)\n"
 "                           multiple values for the same keywords are treated as an array of values for multiple selectors\n"
-"  --help                   query the analysis for its options\n"
 "\n"
 "usage examples:\n\n"
-"Select a standard analysis from the list : \n\tHYPHYMP -i \n"
-"Run a standard analysis with default options and one required user argument; \n\tHYPHYMP busted --alignment path/to/file\n"
-"Run a standard analysis with additional keyword arguments \n\tHYPHYMP busted --alignment path/to/file --srv No\n"
-"See whcih arguments are understood by a standard analysis \n\tHYPHYMP busted --help\n"
-"Run a custom analysis and pass it some arguments \n\tHYPHYMP path/to/hyphy.script argument1 'argument 2' \n"
+"Select a standard analysis from the list : \n\thyphy -i \n"
+"Run a standard analysis with default options and one required user argument; \n\thyphy busted --alignment path/to/file\n"
+"Run a standard analysis with additional keyword arguments \n\thyphy busted --alignment path/to/file --srv No\n"
+"See whcih arguments are understood by a standard analysis \n\thyphy busted --help\n"
+"Run a custom analysis and pass it some arguments \n\thyphy path/to/hyphy.script argument1 'argument 2' \n"
+;
+
+const char hy_available_cli_analyses [] =
+"Available standard analyses and their [analysisName] are listed below:\n\n"
+"        [MEME] Test for episodic site-level selection using MEME (Mixed Effects Model of Evolution).\n"
+"        [FEL] Test for pervasive site-level selection using FEL (Fixed Effects Likelihood).\n"
+"        [FUBAR] Test for pervasive site-level selection using FUBAR (Fast Unconstrained Bayesian AppRoximation for inferring selection).\n"
+"        [FADE] Test a protein alignment for directional selection towards specific amino acids along a specified set of test branches using FADE (a FUBAR Approach to Directional Evolution).\n"
+"        [SLAC] Test for pervasive site-level selection using SLAC (Single Likelihood Ancestor Counting).\n"
+"        [BUSTED] Test for episodic gene-wide selection using BUSTED (Branch-site Unrestricted Statistical Test of Episodic Diversification).\n"
+"        [BGM] Apply Bayesian Graphical Model inference to substitution histories at individual sites.\n"
+"        [aBSREL] Test for lineage-specific evolution using the branch-site method aBS-REL (Adaptive Branch-Site Random Effects Likelihood).\n"
+"        [RELAX] Test for relaxation of selection pressure along a specified set of test branches using RELAX (a random effects test of selection relaxation).\n"
+"        [GARD] Screen an alignment for recombination using GARD (Genetic Algorithm for Recombination Detection).\n\n"
 ;
 
 
@@ -185,8 +203,14 @@ void            mpiOptimizerLoop (int, int);
        if (hyphy_sigterm_in_progress)
            raise (sig);
            
-       hyphy_sigterm_in_progress = 1;
-       HandleApplicationError (_String("HyPhy killed by signal ") & (long)sig);
+        hyphy_sigterm_in_progress = 1;
+        if (lockedLFID != -1) {
+            ((_LikelihoodFunction*)likeFuncList(lockedLFID))->_TerminateAndDump(_String("HyPhy killed by signal ") & (long)sig);
+        } else {
+            HandleApplicationError (_String("HyPhy killed by signal ") & (long)sig);
+
+        }
+    
        
        signal (sig, SIG_DFL);
        raise  (sig);
@@ -464,8 +488,8 @@ long    DisplayListOfChoices (void) {
             } else {
                 _helper_clear_screen ();
                 printf ("***************** FILES IN '%s' ***************** \n\n",((_String*)categoryHeadings(categNumber))->get_str());
-                long start = categoryDelimiters.lData[categNumber]+1,
-                     end = categNumber==categoryDelimiters.lLength-1?availableTemplateFiles.lLength:categoryDelimiters.lData[categNumber+1];
+                long start = categoryDelimiters.list_data[categNumber]+1,
+                     end = categNumber==categoryDelimiters.lLength-1?availableTemplateFiles.lLength:categoryDelimiters.list_data[categNumber+1];
 
                 for (choice = start; choice<end; choice++) {
                     printf ("\n\t(%ld) %s",choice-start+1,((_String const *)availableTemplateFiles.GetItem (choice, 1))->get_str());
@@ -535,7 +559,7 @@ void    ProcessConfigStr (_String const & conf) {
         switch (char c = conf.char_at (i)) {
             case 'h':
             case 'H': {
-                fprintf( stderr, "%s\n%s", hy_usage, hy_help_message );
+                fprintf( stderr, "%s\n%s\n%s", hy_usage, hy_help_message, hy_available_cli_analyses );
                 exit (0);
             }
 
@@ -571,12 +595,6 @@ void    ProcessConfigStr (_String const & conf) {
               logInputMode = true;
               break;
           }
-          //case 'i':
-          //case 'I':
-          //{
-          //pipeMode = true;
-          //break;
-          //}
           default: {
               ReportWarning (_String ("Option" ) & _String (c).Enquote() & " is not valid command line option and will be ignored");
           }
@@ -686,7 +704,13 @@ int main (int argc, char* argv[]) {
      if (signal (SIGINT, hyphy_sigterm_handler) == SIG_IGN)
          signal (SIGINT, SIG_IGN);
 #endif
-  
+    
+    /*long read = 0L;
+    hyFloat value = 0.0;
+    
+    printf ("%ld\n", sscanf (" 0.1e2 beavis", "%lf%n", &value, &read));
+    */
+    
     char    curWd[4096],
             dirSlash = get_platform_directory_char();
     
@@ -700,7 +724,7 @@ int main (int argc, char* argv[]) {
     }
   
     _String libDir = getLibraryPath();
-
+    
 
 #ifdef __MINGW32__
      baseDir = libDir;
@@ -779,6 +803,15 @@ int main (int argc, char* argv[]) {
     
     GlobalStartup();
     ReadInTemplateFiles();
+    
+    if (positional_arguments.empty () && run_help_message) {
+        // --help returns the message below
+        fprintf( stderr, "%s\n%s\n%s", hy_usage, hy_help_message, hy_available_cli_analyses );
+        BufferToConsole("\n");
+        GlobalShutdown();
+        return 0;
+    }
+    
     //ObjectToConsole(&availableTemplateFilesAbbreviations);
     
     if (positional_arguments.Count()) {
@@ -800,7 +833,6 @@ int main (int argc, char* argv[]) {
     ex.SetKWArgs (&kwargs);
     
     
-    
     if (calculatorMode) {
         if (argFile.length()) {
           PushFilePath  (argFile);
@@ -809,6 +841,7 @@ int main (int argc, char* argv[]) {
         }
         printf ("\nHYPHY is running in calculator mode. Type 'exit' when you are finished.\n");
         while (ExpressionCalculator()) ;
+        GlobalShutdown();
         return 0;
     }
 
@@ -820,6 +853,7 @@ int main (int argc, char* argv[]) {
         return 0;
     }
 
+    
     // try to read the preferences
     _String     prefFile (curWd);
     prefFile = prefFile & '/' & prefFileName;
@@ -910,8 +944,8 @@ int main (int argc, char* argv[]) {
 #ifdef __HYPHYMPI__
             if (hy_mpi_node_rank == 0L) {
 #endif
-            BufferToConsole("\nAnalysis options description");
-            BufferToConsole("\n----------------------------\n");
+            NLToConsole();
+            BufferToConsole(analysis_help_message);
             StringToConsole(ex.GenerateHelpMessage());
             NLToConsole();
 #ifdef __HYPHYMPI__
@@ -922,8 +956,10 @@ int main (int argc, char* argv[]) {
             return 0;
         }
 
-        ex.Execute();
 
+         ex.Execute();
+
+ 
         if (usePostProcessors && (!updateMode)) {
             ReadInPostFiles();
             printf ("\n\n**********Continue with result processing (y/n)?");
@@ -977,9 +1013,14 @@ int main (int argc, char* argv[]) {
     _comparative_lf_debug_matrix->toFileStr(comparative_lf_debug_matrix_content_file);
     fclose (comparative_lf_debug_matrix_content_file);
 #endif
-    
+
+
     PurgeAll                    (true);
+    ex.ClearExecutionList();
+    
+
     GlobalShutdown              ();
+    
 
 
 #ifdef __MINGW32__

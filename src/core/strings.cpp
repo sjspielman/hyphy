@@ -52,19 +52,7 @@
 
 
 _String   compileDate = __DATE__,
-          __HYPHY__VERSION__ = _String ("2.3.4.") & compileDate.Cut (7,10) & compileDate.Cut (0,2).Replace("Jan", "01", true).
-                                                                                                  Replace("Feb", "02", true).
-                                                                                                  Replace("Mar", "03", true).
-                                                                                                  Replace("Apr", "04", true).
-                                                                                                  Replace("May", "05", true).
-                                                                                                  Replace("Jun", "06", true).
-                                                                                                  Replace("Jul", "07", true).
-                                                                                                  Replace("Aug", "08", true).
-                                                                                                  Replace("Sep", "09", true).
-                                                                                                  Replace("Oct", "10", true).
-                                                                                                  Replace("Nov", "11", true).
-                                                                                                  Replace("Dec", "12", true)
-                                                                                                  & compileDate.Cut (4,5).Replace (" ", "0", true) & "beta";
+          __HYPHY__VERSION__ = _String ("2.5.0");
 
 using namespace hy_global;
 
@@ -193,15 +181,19 @@ _String::_String(_StringBuffer &&s) {
 
 //=============================================================
 
-_String::_String(_String *s) {
+_String::_String(_String *s, bool dynamic) {
     if (s->CanFreeMe ()) {
         s_data       = s->s_data;
         s_length     = s->s_length;
         s->s_data    = nil;
-        DeleteObject (s);
+        if (dynamic) {
+            DeleteObject (s);
+        }
     } else {
         AllocateAndCopyString (s->s_data, s->s_length);
-        s->RemoveAReference();
+        if (dynamic) {
+            s->RemoveAReference();
+        }
     }
 }
 
@@ -330,6 +322,18 @@ void _String::operator = (_String const& s) {
     Duplicate (&s);
 }
 
+//=============================================================
+void _String::operator = (_String && rhs) {
+    if (this != &rhs) {
+        if (s_data) {
+            free (s_data);
+        }
+        s_data = rhs.s_data;
+        s_length = rhs.s_length;
+        rhs.s_data = nil;
+    }
+}
+
 
 
 /*
@@ -361,9 +365,9 @@ long  _String::NormalizeRange(long & from, long & to) const {
 void _String::AllocateAndCopyString (const char * source_string, unsigned long length) {
     s_length = length;
     s_data = (char*) MemAllocate (length+1UL);
-    if (s_length) {
+    //if (s_length) {
         memcpy (s_data, source_string, length);
-    }
+    //}
     s_data [length] = '\0';
 }
 
@@ -470,6 +474,41 @@ const _String _String::FormatTimeString(long time_diff){
  */
 
 hyComparisonType _String::Compare(_String const& rhs) const {
+    
+    if (s_length <= rhs.s_length) {
+        for (unsigned long i = 0UL; i < s_length; i++) {
+            int diff = s_data[i] - rhs.s_data[i];
+            
+            if (diff < 0) {
+                return kCompareLess;
+            } else {
+                if (diff > 0) {
+                    return kCompareGreater;
+                }
+            }
+        }
+        
+        if (s_length == rhs.s_length) {
+            return kCompareEqual;
+        }
+        return kCompareLess;
+    } else {
+        
+        for (unsigned long i = 0UL; i < rhs.s_length; i++) {
+            int diff = s_data[i] - rhs.s_data[i];
+            
+            if (diff < 0) {
+                return kCompareLess;
+            } else {
+                if (diff > 0) {
+                    return kCompareGreater;
+                }
+            }
+        }
+        return kCompareGreater;
+    }
+    
+    /*
     unsigned long up_to = MIN (s_length, rhs.s_length);
     
     for (unsigned long i = 0UL; i < up_to; i++) {
@@ -485,7 +524,7 @@ hyComparisonType _String::Compare(_String const& rhs) const {
         return kCompareEqual;
     }
     
-    return s_length < rhs.s_length ? kCompareLess : kCompareGreater;
+    return s_length < rhs.s_length ? kCompareLess : kCompareGreater;*/
 }
 
 //=============================================================
@@ -639,7 +678,7 @@ bool _String::EqualWithWildChar(const _String& pattern, const char wildchar, uns
 
 
 //Append operator
-const _String _String::operator & (const _String& rhs) const {
+_String _String::operator & (const _String& rhs) const {
     unsigned long combined_length = s_length + rhs.s_length;
     
     if (combined_length == 0UL) {
@@ -662,7 +701,7 @@ const _String _String::operator & (const _String& rhs) const {
 
 //=============================================================
 
-const _String _String::Chop(long start, long end) const{
+_String _String::Chop(long start, long end) const{
     
     long resulting_length = NormalizeRange(start,end);
     
@@ -684,7 +723,7 @@ const _String _String::Chop(long start, long end) const{
 
 //=============================================================
 
-const _String _String::Cut(long start, long end) const {
+_String _String::Cut(long start, long end) const {
     return _String (*this, start, end);
 }
 
@@ -714,7 +753,7 @@ void _String::Flip(void) {
 
 //=============================================================
 
-const _String _String::Reverse(void) const {
+_String _String::Reverse(void) const {
     
     _String result (*this);
     for (unsigned long s = 0UL, e = s_length - 1L;  s < s_length; s++, e--) {
@@ -1369,15 +1408,27 @@ const _SimpleList _String::RegExpMatch(regex_t const* re, unsigned long start ) 
   _SimpleList matched_pairs;
   
   if (s_length && start < s_length) {
-    regmatch_t *matches = new regmatch_t[re->re_nsub + 1];
-    int error_code = regexec(re, s_data + start, re->re_nsub + 1, matches, 0);
-    if (error_code == 0) {
-      for (long k = 0L; k <= re->re_nsub; k++) {
-        matched_pairs << matches[k].rm_so + start
-                      << matches[k].rm_eo - 1 + start;
-      }
+    
+    regmatch_t static_matches [4];
+    if (re->re_nsub <= 3) {
+        int error_code = regexec(re, s_data + start, re->re_nsub + 1, static_matches, 0);
+        if (error_code == 0) {
+            for (long k = 0L; k <= re->re_nsub; k++) {
+                matched_pairs << static_matches[k].rm_so + start
+                << static_matches[k].rm_eo - 1 + start;
+            }
+        }
+    } else {
+        regmatch_t *matches = new regmatch_t[re->re_nsub + 1];
+        int error_code = regexec(re, s_data + start, re->re_nsub + 1, matches, 0);
+        if (error_code == 0) {
+          for (long k = 0L; k <= re->re_nsub; k++) {
+            matched_pairs << matches[k].rm_so + start
+                          << matches[k].rm_eo - 1 + start;
+          }
+        }
+        delete[] matches;
     }
-    delete[] matches;
   }
   
   return matched_pairs;

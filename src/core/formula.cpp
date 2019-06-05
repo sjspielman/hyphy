@@ -247,7 +247,18 @@ void    _Formula::Clear (void) {
 
 //  theStack.Clear();
 }
-
+//__________________________________________________________________________________
+_StringBuffer const _Formula::toRPN (_hyFormulaStringConversionMode mode, _List* matched_names) {
+    _StringBuffer r;
+    if (theFormula.countitems()) {
+        SubtreeToString (r,nil,0,nil,GetIthTerm(0UL), mode);
+        for (unsigned long k=1UL; k<theFormula.countitems(); k++) {
+            r <<'|';
+            SubtreeToString (r,nil,0,nil,GetIthTerm(k), mode);
+        }
+    }
+    return r;
+}
 //__________________________________________________________________________________
 BaseRef _Formula::toStr (_hyFormulaStringConversionMode mode, _List* matched_names, bool drop_tree) {
     ConvertToTree(false);
@@ -261,12 +272,7 @@ BaseRef _Formula::toStr (_hyFormulaStringConversionMode mode, _List* matched_nam
         SubtreeToString (*result, theTree, -1, matched_names, nil, mode);
     } else {
         if (theFormula.countitems()) {
-            (*result) << "RPN:";
-            SubtreeToString (*result,nil,0,nil,GetIthTerm(0UL), mode);
-            for (unsigned long k=1UL; k<theFormula.countitems(); k++) {
-                (*result)<<'|';
-                SubtreeToString (*result,nil,0,nil,GetIthTerm(k), mode);
-            }
+            (*result) << "RPN:" << toRPN (mode, matched_names);
         }
     }
 
@@ -306,8 +312,6 @@ _Formula* _Formula::Differentiate (_String const & var_name, bool bail, bool con
 
     long dx_id = dx->get_index();
 
-    _Formula*     res = new _Formula ();
-
      ConvertToTree    ();
     
      //printf ("\n **** Diff %s on %s\n\n", _String ((_String*)toStr(kFormulaStringConversionNormal)).get_str(), var_name.get_str());
@@ -320,6 +324,7 @@ _Formula* _Formula::Differentiate (_String const & var_name, bool bail, bool con
         return new _Formula (new _Constant (0.0));
     }
 
+    _Formula*     res = new _Formula ();
     _Formula    ** dydx = new _Formula* [var_refs.countitems()] {0};// stores precomputed derivatives for all the
     
     auto dydx_cleanup = [&] () -> void {
@@ -343,6 +348,7 @@ _Formula* _Formula::Differentiate (_String const & var_name, bool bail, bool con
             } else {
                 dYdX = thisVar->varFormula->Differentiate (var_name, bail, false);
                 if (dYdX->IsEmpty()) {
+                    delete dYdX;
                     dydx_cleanup ();
                     return res;
                 }
@@ -357,7 +363,6 @@ _Formula* _Formula::Differentiate (_String const & var_name, bool bail, bool con
 
         if (!(dTree = InternalDifferentiate (theTree, dx_id, var_refs, dydx, *res))) {
             throw (_String ("Differentiation of ") & _String((_String*)toStr(kFormulaStringConversionNormal)) & " failed.");
-            res->Clear();
         }
     } catch (_String const &e) {
         dydx_cleanup ();
@@ -511,7 +516,6 @@ node<long>* _Formula::InternalDifferentiate (node<long>* currentSubExpression, l
                     throw (4);
                 }
 
-                node<long>*       full_expression = new node<long>;
                 node<long>*       y_raise_m2 = new node<long>;
                 node<long>*       yDx_minus_xDy = new node<long>;
                 node<long>*       xDy = new node<long>;
@@ -1905,8 +1909,6 @@ HBLObjectRef _Formula::Compute (long startAt, _VariableContainer const * nameSpa
           }
         }
 
-
-
         /*ticker++;
         if (ticker >= 1462440) {
           printf ("\n_Formula::Compute (%x, %d)  %ld terms, stack depth %ld\n", this, ticker, theFormula.lLength, theStack.theStack.lLength);
@@ -1985,7 +1987,10 @@ HBLObjectRef _Formula::Compute (long startAt, _VariableContainer const * nameSpa
             }
         }
         if (scrap_here->StackDepth() != 1L || !wellDone) {
-            _String errorText = _String ("'") & _String((_String*)toStr(kFormulaStringConversionNormal)) & _String("' evaluated with errors.");
+            _String errorText = _String ("'") & _String((_String*)toStr(kFormulaStringConversionNormal)) & _String("' evaluated with errors ");
+            if (errMsg && errMsg->nonempty()) {
+                errorText = errorText & " " & errMsg->Enquote('(',')');
+            }
 
             if (scrap_here->StackDepth() > 1 && wellDone) {
                 errorText = errorText & " Unconsumed values on the stack";
@@ -2273,7 +2278,7 @@ hyFloat _Formula::ComputeSimple (_SimpleFormulaDatum* stack, _SimpleFormulaDatum
         unsigned long upper_bound = NumberOperations();
 
         for (unsigned long i=0UL; i<upper_bound; i++) {
-            _Operation* thisOp = ItemAt (i);
+            _Operation const* thisOp = ItemAt (i);
             if (thisOp->theNumber) {
                 stack[stackTop++].value = thisOp->theNumber->Value();
                 continue;
@@ -2381,7 +2386,7 @@ bool _Formula::HasChanged (bool ingoreCats) {
         if (this_op->IsAVariable()) {
             data_id = this_op->GetAVariable();
             if (data_id>=0) {
-                if (((_Variable*)(((BaseRef*)(variablePtrs.lData))[data_id]))->HasChanged(ingoreCats)) {
+                if (((_Variable*)(((BaseRef*)(variablePtrs.list_data))[data_id]))->HasChanged(ingoreCats)) {
                     return true;
                 }
             } else if (this_op->theNumber->HasChanged()) {
@@ -2423,7 +2428,7 @@ void _Formula::ScanFormulaForHBLFunctions (_AVLListX& collection , bool recursiv
     }
   };
 
-  ConvertToTree();
+  ConvertToTree(false);
 
   if (theTree) {
 
@@ -2482,7 +2487,7 @@ bool _Formula::HasChangedSimple (_SimpleList& variableIndex) {
         if (this_op->theNumber) {
             continue;
         } else if (this_op->theData >= 0) {
-            if (((_Variable*)(((BaseRef*)(variablePtrs.lData))[variableIndex.lData[this_op->theData]]))->HasChanged(false)) {
+            if (((_Variable*)(((BaseRef*)(variablePtrs.list_data))[variableIndex.list_data[this_op->theData]]))->HasChanged(false)) {
                 return true;
             }
         } else {
@@ -2717,7 +2722,7 @@ HBLObjectRef _Formula::GetTheMatrix (void) {
 //__________________________________________________________________________________
 long _Formula::ObjectClass (void) {
     if (theStack.StackDepth()) {
-        return ((HBLObjectRef)theStack.theStack.lData[0])->ObjectClass();
+        return ((HBLObjectRef)theStack.theStack.list_data[0])->ObjectClass();
     }
 
     HBLObjectRef res =   Compute();
@@ -2758,47 +2763,51 @@ void    _Formula::ConvertToTree (bool err_msg) {
         _SimpleList nodeStack;
 
         unsigned long const upper_bound = NumberOperations();
+        theTree = nil;
+        try {
         
-        for (unsigned long i=0UL; i<upper_bound; i++) {
+            for (unsigned long i=0UL; i<upper_bound; i++) {
 
-            _Operation* currentOp = ItemAt(i);
+                _Operation* currentOp = ItemAt(i);
 
-            if (currentOp->theNumber || currentOp->theData >= 0L || currentOp->theData <= -2L) { // a data bit
-                node<long>* leafNode = new node<long>;
-                leafNode->init(i);
-                nodeStack<<(long)leafNode;
-            } else { // an operation
-                long nTerms = currentOp->GetNoTerms();
-                if (nTerms<0L) {
-                    nTerms = GetBFFunctionArgumentCount(currentOp->opCode);
-                }
-
-                if (nTerms>nodeStack.lLength) {
-                    if (err_msg) {
-                        HandleApplicationError (_String ("Insufficient number of arguments for a call to ") & _String ((_String*)currentOp->toStr()) & " while converting " & _String ((_String*)toStr(kFormulaStringConversionNormal)).Enquote() & " to a parse tree");
+                if (currentOp->theNumber || currentOp->theData >= 0L || currentOp->theData <= -2L) { // a data bit
+                    node<long>* leafNode = new node<long>;
+                    leafNode->init(i);
+                    nodeStack<<(long)leafNode;
+                } else { // an operation
+                    long nTerms = currentOp->GetNoTerms();
+                    if (nTerms<0L) {
+                        nTerms = GetBFFunctionArgumentCount(currentOp->opCode);
                     }
-                    theTree = nil;
-                    return;
-                }
 
-                node<long>* operationNode = new node<long>;
-                operationNode->init(i);
-                for (long j=0; j<nTerms; j++) {
-                    operationNode->prepend_node(*((node<long>*)nodeStack.Pop()));
+                    if (nTerms>nodeStack.lLength) {
+                        throw (_String ("Insufficient number of arguments for a call to ") & _String ((_String*)currentOp->toStr()) & " while converting " & toRPN(kFormulaStringConversionNormal).Enquote() & " to a parse tree");
+                    }
+
+                    node<long>* operationNode = new node<long>;
+                    operationNode->init(i);
+                    for (long j=0; j<nTerms; j++) {
+                        operationNode->prepend_node(*((node<long>*)nodeStack.Pop()));
+                    }
+                    nodeStack<<(long)operationNode;
                 }
-                nodeStack<<(long)operationNode;
             }
-        }
-        if (nodeStack.lLength!=1) {
+            if (nodeStack.lLength!=1) {
+                throw ((_String)"The expression '" & toRPN (kFormulaStringConversionNormal) & "' has " & (long)nodeStack.lLength & " terms left on the stack after evaluation");
+            } else {
+                theTree = (node<long>*)nodeStack(0);
+            }
+        } catch (_String const e) {
             if (err_msg) {
-                HandleApplicationError ((_String)"The expression '" & _String ((_String*)toStr(kFormulaStringConversionNormal)) & "' has " & (long)nodeStack.lLength & " terms left on the stack after evaluation");
+                HandleApplicationError(e);
             }
+            nodeStack.Each ([this] (long v, unsigned long) -> void {
+                node<long>* operationNode = (node<long>*)v;
+                operationNode->delete_tree();
+                delete (operationNode);
+            });
             theTree = nil;
-        } else {
-            theTree = (node<long>*)nodeStack(0);
         }
-
-
     }
 }
 //__________________________________________________________________________________

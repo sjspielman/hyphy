@@ -47,7 +47,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "matrix.h"
 #include "vector.h"
 
-#define   A_LARGE_NUMBER          1.e100
+//#define   NUMERICAL_INFINITY          INFINITY
 
 #define   DEFAULTPARAMETERLBOUND  0.0
 #define   DEFAULTPARAMETERUBOUND  10000.0
@@ -199,10 +199,10 @@ public:
     void        PrepareToCompute (bool = false);
     void        DoneComputing    (bool = false);
     virtual
-    _Matrix*    Optimize ();
+    _Matrix*    Optimize (_AssociativeList const* options = nil);
     _Matrix*    ConstructCategoryMatrix     (const _SimpleList&, unsigned, bool = true, _String* = nil);
 
-    hyFloat  SimplexMethod               (hyFloat& precision);
+    hyFloat     SimplexMethod               (hyFloat& precision, unsigned long max_iterations = 100000UL, unsigned long max_evals = 0xFFFFFF);
     void        Anneal                      (hyFloat& precision);
 
     void        Simulate                    (_DataSet &,_List&, _Matrix* = nil, _Matrix* = nil, _Matrix* = nil, _String const* = nil) const;
@@ -315,6 +315,7 @@ public:
     void    UnregisterListeners                  (void);
     void    DetermineLocalUpdatePolicy           (void);
     void    FlushLocalUpdatePolicy               (void);
+    void   _TerminateAndDump           (const _String& error, bool sig_term = false);
 
 protected:
 
@@ -365,14 +366,14 @@ protected:
 
 
     long            Bracket                 (long , hyFloat& , hyFloat& , hyFloat& ,
-            hyFloat& , hyFloat& , hyFloat& , hyFloat&, _Matrix* = nil);
+            hyFloat& , hyFloat& , hyFloat& , hyFloat&, bool, _Matrix* = nil);
     //long          GradientBracketOneVar (_Matrix&, _Matrix& , _Matrix& , _Matrix&,  hyFloat& ,
     //                                      hyFloat&, hyFloat&, hyFloat&, bool retry = false);
-    void            LocateTheBump         (long,hyFloat , hyFloat& , hyFloat&, hyFloat = -1.);
+    void            LocateTheBump         (long,hyFloat , hyFloat& , hyFloat&, bool, hyFloat = -1.);
     void            GradientLocateTheBump (hyFloat, hyFloat&, _Matrix&, _Matrix&);
     void            GradientDescent       (hyFloat& , _Matrix& );
     hyFloat            ConjugateGradientDescent
-    (hyFloat , _Matrix& , bool localOnly = false, long = 0x7fffffff,_SimpleList* only_these_parameters = nil, hyFloat check_lf = A_LARGE_NUMBER);
+    (hyFloat , _Matrix& , bool localOnly = false, long = 0x7fffffff,_SimpleList* only_these_parameters = nil, hyFloat check_lf = -INFINITY);
 
     hyFloat      SetParametersAndCompute
     (long, hyFloat, _Matrix* = nil, _Matrix* = nil,  bool skip_compute = false);
@@ -411,7 +412,6 @@ protected:
     */
   
     void            ComputeParameterPenalty     (void);
-    void            _TerminateAndDump           (const _String& error);
 
 
     bool            SendOffToMPI                (long);
@@ -717,7 +717,7 @@ extern  bool forceRecomputation,
         isInOptimize;
 
 extern  long lockedLFID;
-
+/*
 extern  _String // declare shared global keys/settings
 globalStartingPoint             ,
 randomStartingPerturbations    ,
@@ -763,7 +763,7 @@ supportMatrixVariable          ,
 optimizationStatusFile         ,
 autoParalellizeLF              ,
 addLFSmoothing                 ,
-reduceLFSmoothing              ;
+reduceLFSmoothing              ;*/
 
 
 

@@ -113,6 +113,31 @@ BaseRef _Variable::makeDynamic (void) const{
 }
 
 //__________________________________________________________________________________
+void * _Variable::operator new (size_t size) {
+     return MemAllocate (size);
+}
+
+//__________________________________________________________________________________
+void  _Variable::operator delete (void * p) {
+    free (p);
+}
+
+//__________________________________________________________________________________
+
+unsigned long        _Variable::ObjectClass (void) const {
+    
+    if (varValue) {
+        return varValue->ObjectClass();
+    }
+    
+    if (varFormula && !varFormula->IsEmpty()) {
+        return varFormula->ObjectClass();
+    }
+    
+    return NUMBER;
+}
+
+//__________________________________________________________________________________
 bool _Variable::CheckFForDependence (long idx, bool opt)
 {
     if (varFormula) {
@@ -163,8 +188,7 @@ _Variable::_Variable (_String const&s, bool isG) {
 
 //__________________________________________________________________________________
 
-_Variable::_Variable (_String const&s, _String const &f, bool isG)//:  _Formula (f)
-{
+_Variable::_Variable (_String const&s, _String const &f, bool isG) {
     //hasBeenChanged = false;
     //isGlobal = isG;
     theName     = new _String(s);
@@ -189,15 +213,9 @@ _Variable::_Variable (_String const&s, _String const &f, bool isG)//:  _Formula 
 
 //__________________________________________________________________________________
 
-_Variable::~_Variable (void)
-{
-  //nInstances++;
-    if (varValue) {
-        DeleteObject (varValue);
-    }
-    if (theName) {
-        DeleteObject (theName);
-    }
+_Variable::~_Variable (void) {
+    DeleteObject (varValue);
+    DeleteObject (theName);
     if (varFormula) {
         delete (varFormula);
     }
@@ -237,6 +255,16 @@ HBLObjectRef  _Variable::ComputeMatchingType(long type) {
 HBLObjectRef  _Variable::Compute (void) // compute or return the value
 {
     // call_count++;
+    
+    auto update_var_value = [this] () -> void {
+        if (!varValue || varFormula->HasChanged()) {
+            HBLObjectRef new_value = (HBLObjectRef)varFormula->Compute()->makeDynamic();
+            DeleteObject (varValue);
+            varValue = new_value;
+            //DeleteObject (varValue);
+            //(varValue = varFormula->Compute())->AddAReference();
+        }
+    };
   
     if (varFlags & HY_VARIABLE_COMPUTING) {
       HandleApplicationError (_String ("A recursive dependency error in _Variable::Compute; this is an HBL implementation bug; offending variable is '") & *GetName() & "'");
@@ -264,21 +292,14 @@ HBLObjectRef  _Variable::Compute (void) // compute or return the value
             if ((varFlags & HY_DEP_V_COMPUTED) && varValue) {
                 varFlags &= HY_VARIABLE_COMPUTING_CLR;
                 return varValue;
-            } else if (varFormula->HasChanged()||!varValue) {
-                HBLObjectRef new_value = (HBLObjectRef)varFormula->Compute()->makeDynamic();
-                DeleteObject (varValue);
-                varValue = new_value;
-                //printf ("Recomputing value of %s => %g\n", theName->sData, varValue->Value());
+            } else {
+                update_var_value ();
             }
+                
             varFlags |= HY_DEP_V_COMPUTED;
           
-        } else if (varFormula->HasChanged()||!varValue) {
-              /* if varFormula depends on *this* variable, doing delete-set
-                 would cause the expression to reference deleted memory.
-               */
-            HBLObjectRef new_value = (HBLObjectRef)varFormula->Compute()->makeDynamic();
-            DeleteObject (varValue);
-            varValue = new_value;
+        } else {
+            update_var_value ();
         }
 
     }
@@ -396,7 +417,7 @@ void  _Variable::SetValue (HBLObjectRef theP, bool dup) // set the value of the 
         }
       
         /*if (valueClass & (TREE)) {
-            variablePtrs.lData[theIndex] = (long)(((_TheTree*)theP)->makeDynamicCopy(GetName()));
+            variablePtrs.list_data[theIndex] = (long)(((_TheTree*)theP)->makeDynamicCopy(GetName()));
             DeleteObject(this);
         } else*/ {
             if (dup) {
@@ -493,7 +514,7 @@ void    _Variable::ClearConstraints (void)
         _Variable newVar (*GetName(), IsGlobal());
         newVar.SetValue ((HBLObjectRef)Compute()->makeDynamic(),false);
         ReplaceVar ( &newVar);
-        /*_Matrix * modelMatrix = (_Matrix*)LocateVar(modelMatrixIndices.lData[1])->GetValue();
+        /*_Matrix * modelMatrix = (_Matrix*)LocateVar(modelMatrixIndices.list_data[1])->GetValue();
         for (long k=0; k<4; k++)
             for (long k2 = 0; k2<4; k2++)
                 if (k!=k2)
@@ -503,6 +524,8 @@ void    _Variable::ClearConstraints (void)
                 }
         */
     } else {
+        //printf ("ClearConstraints %s %x\n", GetName()->get_str(), varFormula);
+
         if (!IsIndependent()) {
             SetValue ((HBLObjectRef)Compute()->makeDynamic(),false);
         }

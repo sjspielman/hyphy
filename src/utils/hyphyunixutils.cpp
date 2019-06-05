@@ -281,7 +281,7 @@ void mpiNormalLoop    (int rank, int size, _String & baseDir)
                     }
                   
                     resStr       = new _StringBuffer (1024UL);
-                    lf->SerializeLF(*resStr,hy_env::EnvVariableTrue (shortMPIReturn) ? _hyphyLFSerializeModeShortMPI:_hyphyLFSerializeModeLongMPI);
+                    lf->SerializeLF(*resStr,hy_env::EnvVariableTrue (hy_env::short_mpi_return) ? _hyphyLFSerializeModeShortMPI:_hyphyLFSerializeModeLongMPI);
                 }
             } else {
                 //ReportWarning(_String ("[MPI] Received commands\n") & *theMessage & "\n");
@@ -350,11 +350,11 @@ void mpiOptimizerLoop (int rank, int size)
             _StringBuffer      variableSpec (128UL);
 
 
-            (variableSpec) << LocateVar(ivl->lData[0])->GetName();
+            (variableSpec) << LocateVar(ivl->list_data[0])->GetName();
             
             for (long kk = 1; kk < ivl->lLength; kk++) {
               (variableSpec) << ';';
-              (variableSpec) << LocateVar(ivl->lData[kk])->GetName();
+              (variableSpec) << LocateVar(ivl->list_data[kk])->GetName();
             }
           
             ReportWarning         (_String("[MPI] Sending back the following variable list\n") & variableSpec);

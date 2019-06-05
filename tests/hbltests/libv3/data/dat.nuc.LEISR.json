@@ -2,16 +2,16 @@
  "MLE":{
    "content":{
      "0":      [
-[0.570562929088465, 0.1333497807584771, 1.833004222067008, -12.94782751041132, -12.51854526896768]
-      [0.6568215723105455, 0.1480311010574118, 2.443139849528537, -14.040502768049, -13.82338579743635]
-      [1.035159750473438, 0.2872321715426518, 3.637143614490959, -15.33986669954094, -15.33815827102963]
-      [1.139544392072012, 0.2942796929698176, 6.031385274104765, -16.01863386457895, -15.9916175878502]
-      [1.701128578914814, 0.4348526001250598, 29.609176233397, -19.24344435908563, -18.99141468010826]
-      [0.4097885764725855, 0.06516428093608773, 1.522452933767312, -14.15497550185157, -13.30229781723376]
-      [1.908675192494094, 0.533079753423364, 29.6091334803626, -18.67054955599659, -18.14593708433602]
-      [0.9981029708196029, 0.2597649318133017, 4.681228570602239, -16.55804947232372, -16.55799828454667]
-      [1.436351518465124, 0.4679022438714769, 29.60906808796869, -18.75404786476332, -18.47595249484484]
-      [1.734304444120967, 0.3943888476431114, 17.4960708810273, -18.09686370409776, -17.80398978535068]
+[0.5384615384615384, 0.1372191943593977, 1.880914134227937, -12.77692371165735, -12.40071257308634],
+      [0.6603756605556496, 0.1512324283933114, 2.542171214099065, -14.13218337442437, -13.93885188329404],
+      [1, 0.2948145476047391, 3.929453606679452, -15.52145306222049, -15.52145305910719],
+      [1.096285489090653, 0.2874523957004698, 5.7101049248608, -15.77329268425912, -15.76095454346614],
+      [1.857142857142857, 0.4491382066339303, 10000, -19.21382937416607, -18.92547703553756],
+      [0.3766648658697112, 0.06162334117337202, 1.527042038109336, -14.12614963470566, -13.28279272210165],
+      [2.001202361652531, 0.6176652982065289, 10000, -19.09360141063827, -18.38551330640309],
+      [0.9264174030945416, 0.2578348689887755, 4.076710382273022, -16.36670789788454, -16.36416064580059],
+      [1.63326563410493, 0.4697622821035028, 10000, -18.82215960547451, -18.52127294358958],
+      [1.699473861890318, 0.3806235165379026, 15.53141165878932, -17.9469622409221, -17.7112530226386] 
       ]
     },
    "headers":    [
@@ -19,21 +19,20 @@
     ["Lower", "Lower bound of 95% profile likelihood CI"],
     ["Upper", "Upper bound of 95% profile likelihood CI"],
     ["LogL global", "Site log likelihood under the global (average rate) model fit"],
-    ["LogL local", "Site log likelihood under the local (site-specific rate) model fit"],
+    ["LogL local", "Site log likelihood under the local (site-specific rate) model fit"] 
     ]
   },
  "analysis":{
    "authors":"Sergei L Kosakovsky Pond and Stephanie J Spielman",
    "citation":"Spielman, S.J. and Kosakovsky Pond, S.L. (2018). Relative evolutionary rate inference in HyPhy with PeerJ 6:e4339. DOI 10.7717/peerj.4339 ; Pupko, T., Bell, R. E., Mayrose, I., Glaser, F. & Ben-Tal, N. Rate4Site: an algorithmic tool for the identification of functional regions in proteins by surface mapping of evolutionary determinants within their homologues. Bioinformatics 18, S71–S77 (2002).",
    "contact":"{spond,stephanie.spielman}@temple.edu",
-   "info":"LEISR (Likelihood Estimation of Individual Site Rates) infer relative amino-acid or nucleotide rates from a fixed nucleotide or amino-acid alignment and tree, with possibility for partitions. Relative site-specific substitution rates are
-    inferred by first optimizing alignment-wide branch lengths, and then inferring a site-specific uniform tree scaler.",
+   "info":"LEISR (Likelihood Estimation of Individual Site Rates) infer relative amino-acid or nucleotide rates from a fixed nucleotide or amino-acid alignment and tree, with possibility for partitions. Relative site-specific substitution rates are\n    inferred by first optimizing alignment-wide branch lengths, and then inferring a site-specific uniform tree scaler.",
    "version":"0.4"
   },
  "branch attributes":{
    "0":{
      "Node10":{
-       "HKY85":0.4551821333359445
+       "HKY85":0.3903850848328642
       },
      "Node13":{
        "HKY85":0
@@ -42,13 +41,13 @@
        "HKY85":0
       },
      "Node16":{
-       "HKY85":0.4616166252111789
+       "HKY85":0.4331411468929352
       },
      "Node2":{
-       "HKY85":0.1094991201044228
+       "HKY85":0.04418769007365241
       },
      "Node20":{
-       "HKY85":1.598614669387618
+       "HKY85":0.9823832923827267
       },
      "Node23":{
        "HKY85":0
@@ -60,20 +59,20 @@
        "HKY85":0
       },
      "Node5":{
-       "HKY85":0.5525356978629691
+       "HKY85":0.6385091169554044
       },
      "Node6":{
        "HKY85":0
       },
      "Node9":{
-       "HKY85":0.3304362550239794
+       "HKY85":0.3540774150497419
       },
      "t1":{
-       "HKY85":0.2672701690499124,
+       "HKY85":0.218943770825635,
        "original name":"t1"
       },
      "t10":{
-       "HKY85":0.218451920640767,
+       "HKY85":0.1772856169251307,
        "original name":"t10"
       },
      "t11":{
@@ -81,7 +80,7 @@
        "original name":"t11"
       },
      "t12":{
-       "HKY85":0.9650888861016619,
+       "HKY85":1.021555501342369,
        "original name":"t12"
       },
      "t13":{
@@ -89,11 +88,11 @@
        "original name":"t13"
       },
      "t14":{
-       "HKY85":0.5685907988625749,
+       "HKY85":0.5655668399868149,
        "original name":"t14"
       },
      "t15":{
-       "HKY85":368.5033177806769,
+       "HKY85":48.84839922747997,
        "original name":"t15"
       },
      "t2":{
@@ -101,7 +100,7 @@
        "original name":"t2"
       },
      "t3":{
-       "HKY85":0.3991050495770374,
+       "HKY85":0.5167367720089503,
        "original name":"t3"
       },
      "t4":{
@@ -109,11 +108,11 @@
        "original name":"t4"
       },
      "t5":{
-       "HKY85":214.1608064013714,
+       "HKY85":156.4396878919363,
        "original name":"t5"
       },
      "t6":{
-       "HKY85":131.4891061984801,
+       "HKY85":323.3532217766138,
        "original name":"t6"
       },
      "t7":{
@@ -121,11 +120,11 @@
        "original name":"t7"
       },
      "t8":{
-       "HKY85":0.3877661323895439,
+       "HKY85":0.4132114223120388,
        "original name":"t8"
       },
      "t9":{
-       "HKY85":0,
+       "HKY85":0.4049626056431154,
        "original name":"t9"
       }
     },
@@ -143,23 +142,23 @@
  "data partitions":{
    "0":{
      "coverage":      [
-[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9] 
       ],
      "name":"leisr.filter.default"
     }
   },
  "fits":{
    "HKY85":{
-     "AIC-c":406.4630819234314,
+     "AIC-c":406.3600853147389,
      "Equilibrium frequencies":      [
-[0.2666666666666667]
-      [0.2533333333333334]
-      [0.2666666666666667]
-      [0.2133333333333333]
+[0.2666666666666667],
+      [0.2533333333333334],
+      [0.2666666666666667],
+      [0.2133333333333333] 
       ],
-     "Log Likelihood":-163.8247613006988,
+     "Log Likelihood":-163.7732629963525,
      "Rate Distributions":{
-       "Transitition/transversion ratio":2.370371372423658
+       "Transitition/transversion ratio":2.166483623427604
       },
      "estimated parameters":31
     }

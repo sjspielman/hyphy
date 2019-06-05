@@ -74,8 +74,18 @@ class _ExecutionList;
 class _StringBuffer;
 
 class _String : public BaseObj {
+    
+protected:
+    char          *s_data;
+    unsigned long s_length;
+    
+    /** this value is returned for "failed"
+     access operations that don't throw errors, e.g. getChar */
+    const static char default_return = '\0';
 
 public:
+    
+    
   /*
    ==============================================================
    Constructors/Destructors/Copiers
@@ -188,7 +198,7 @@ public:
    * Revision history
    - SLKP 20170517 reviewed while porting from v3 branch
    */
-  _String(_String *dynamic_string);
+  _String(_String *dynamic_string, bool dynamic = true);
 
   /**
    * Copy a part of another string into this string
@@ -298,6 +308,8 @@ public:
 
    */
   void operator=(_String const &rhs);
+
+  void operator=(_String &&rhs);
 
   /*
    ==============================================================
@@ -567,7 +579,7 @@ public:
    *  Revision history
       - SLKP 20170519 reviewed while porting from v3 branch
   */
-  const _String operator&(const _String &rhs) const;
+  _String operator&(const _String &rhs) const;
 
   /**
    * Removes part of string that is between the two specified indices
@@ -581,7 +593,7 @@ public:
    *  Revision history
       - SLKP 20170519 reviewed while porting from v3 branch
    */
-  const _String Chop(long start, long end) const;
+   _String Chop(long start, long end) const;
 
   /**
    * Cuts part of string that is between the two specified indices (0-bases,
@@ -596,7 +608,7 @@ public:
    *  Revision history
       - SLKP 20170519 reviewed while porting from v3 branch
    */
-  const _String Cut(long, long) const;
+   _String Cut(long, long) const;
 
   /**
    * Delete a range of chars from the string (0-based, inclusive indices)
@@ -631,7 +643,7 @@ public:
    *  Revision history
     - SLKP 20170519 reviewed ; (was missing in v3)
    */
-  const _String Reverse(void) const;
+   _String Reverse(void) const;
 
   /**
    * Insert a char at a given position
@@ -922,7 +934,7 @@ public:
 
   /**
    * Checks to see if String begins with substring
-   * \n\n \b Example: \code _String("hyphy").beginswith("h")\endcode
+   * \n\n \b Example: \code _String("hyphy").BeginsWith("h")\endcode
    * @param pattern Substring
    * @param case_sensitive If true, it will be case sensitive. Default is case
    sensitive.
@@ -940,7 +952,7 @@ public:
 
   /**
    * Checks to see if String ends with substring
-   * \n\n \b Example: \code _String("hyphy").endswith("hy")\endcode
+   * \n\n \b Example: \code _String("hyphy").EndsWith("hy")\endcode
    * @param pattern Substring
    * @param case_sensitive If true, it will be case sensitive. Default is case
    sensitive.
@@ -1442,13 +1454,6 @@ public:
                                      bool case_sensitive,
                                      bool handle_errors) const;
 
-protected:
-  unsigned long s_length;
-  char *s_data;
-    
-    /** this value is returned for "failed"
-     access operations that don't throw errors, e.g. getChar */
-  const static char default_return = '\0';
 
 private:
   /** Find the length of the maximum prefix that forms a valid ID

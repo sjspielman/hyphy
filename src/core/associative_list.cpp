@@ -104,14 +104,13 @@ bool _AssociativeList::ParseStringRepresentation (_String& serialized_form, _For
             _ElementaryCommand::ExtractConditions (*(_String*)splitKeys(k), 0, key_value_pair, ':' , false);
             if (key_value_pair.countitems() == 2UL) {
                 
-                _String  key        (compute_keys_values ? ProcessLiteralArgument((_String*)key_value_pair(0),theP) : *(_String*)key_value_pair(0)),
-                         errMsg;
+                _String  key        (compute_keys_values ? ProcessLiteralArgument((_String*)key_value_pair(0),theP) : *(_String*)key_value_pair(0));
               
                 if (key.empty()) {
                   key = *(_String*)key_value_pair(0);
                 }
                 
-                _Formula value      (*(_String*)key_value_pair(1),theP, doErrors?nil :&errMsg);
+                _Formula value      (*(_String*)key_value_pair(1),theP, doErrors?nil :fpc.errMsg());
                 HBLObjectRef   valueC  = compute_keys_values ? value.Compute() : new _MathObject;
               
                 if (valueC) {
@@ -413,19 +412,18 @@ void _AssociativeList::DeleteByKey (_String const& key) {
 
 
 //_____________________________________________________________________________________________
-void _AssociativeList::MStore (HBLObjectRef p, HBLObjectRef inObject, bool repl, long opCode) {
+bool _AssociativeList::MStore (_String * p, HBLObjectRef inObject, bool repl, long opCode) {
     if (!p) {
-        return;
+        return false;
     }
-
-    _FString * index = (_FString*)p;
-    long       f     = avl.Find (&index->get_str());
-
+    
+    long       f     = avl.Find (p);
+    
     if (f>=0) { // already exists - replace
         if (opCode == HY_OP_CODE_ADD) {
             _List arguments;
             arguments << inObject;
-          
+            
             HBLObjectRef newObject = ((HBLObjectRef)avl.GetXtra(f))->ExecuteSingleOp(HY_OP_CODE_ADD,&arguments);
             if (repl == false) {
                 DeleteObject (inObject);
@@ -435,14 +433,24 @@ void _AssociativeList::MStore (HBLObjectRef p, HBLObjectRef inObject, bool repl,
             inObject = newObject;
         }
         avl.xtraD.Replace (f, inObject, repl);
+        return false;
     } else { // insert new
         if (repl) {
             BaseRef br = inObject->makeDynamic();
-            avl.Insert (index->get_str().makeDynamic(),(long)br,false);
+            avl.Insert (p,(long)br,false);
             //br->nInstances--;
         } else {
-            avl.Insert (index->get_str().makeDynamic(),(long)inObject,false);
+            avl.Insert (p,(long)inObject,false);
         }
+        return true;
+    }
+}
+
+//_____________________________________________________________________________________________
+void _AssociativeList::MStore (HBLObjectRef p, HBLObjectRef inObject, bool repl, long opCode) {
+    _StringBuffer *sr = ((_FString*)p)->get_str_ref();
+    if (!MStore (sr, inObject, repl, opCode)) {
+        sr->RemoveAReference();
     }
 }
 
@@ -695,7 +703,7 @@ HBLObjectRef _AssociativeList::ExecuteSingleOp (long opCode, _List* arguments, _
       _AVLList unique_values (&unique_values_aux);
       
       for (unsigned long k=0UL; k<avl.dataList->lLength; k++) {
-        BaseRef anItem = ((BaseRef*)avl.dataList->lData)[k];
+        BaseRef anItem = ((BaseRef*)avl.dataList->list_data)[k];
         if (anItem) {
           _String* string_value = (_String*) avl.GetXtra(k)->toStr();
           if (unique_values.Insert (string_value, 0L, false) < 0) {
@@ -712,7 +720,7 @@ HBLObjectRef _AssociativeList::ExecuteSingleOp (long opCode, _List* arguments, _
       if (avl.emptySlots.lLength) {
         _List  dataListCompact;
         for (long k=0; k<avl.dataList->lLength; k++) {
-          BaseRef anItem = ((BaseRef*)avl.dataList->lData)[k];
+          BaseRef anItem = ((BaseRef*)avl.dataList->list_data)[k];
           if (anItem) {
             dataListCompact << anItem;
           }
@@ -740,7 +748,10 @@ HBLObjectRef _AssociativeList::ExecuteSingleOp (long opCode, _List* arguments, _
   switch (opCode) { // next check operations without arguments or with one argument
     case HY_OP_CODE_ADD: // +
       if (arg0) {
-        MStore (_String((long)avl.countitems()), arg0, true);
+        _String * new_key = new _String((long)avl.countitems());
+        if (!MStore (new_key, arg0, true)) {
+            DeleteObject (new_key);
+        }
         return new _Constant (avl.countitems());
       }
       return Sum ();

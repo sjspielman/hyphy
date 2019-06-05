@@ -58,9 +58,11 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 struct    _CELInternals {
     _SimpleFormulaDatum     * values,
                             * stack;
+    
+    bool                    *is_compiled;
 
-    _SimpleList       varList,
-                      storeResults;
+    _SimpleList             varList,
+                            storeResults;
 
 };
 
@@ -96,14 +98,14 @@ public:
     
     void        SetKWArgs   (_AssociativeList*);
 
-    HBLObjectRef   Execute                     (_ExecutionList* parent = nil);
+    HBLObjectRef   Execute                     (_ExecutionList* parent = nil, bool ignore_parent_kwargs = false);
         // if parent is specified, copy stdin redirects from it
         // run this execution list
     HBLObjectRef   GetResult                   (void) {
         return result;
     }
-    void        ExecuteSimple               (void);             // run a simple compiled list
-    bool        TryToMakeSimple             (void);             // see if a list can be made into a compiled version
+    void        ExecuteSimple               (_ExecutionList * parent = nil);             // run a simple compiled list
+    bool        TryToMakeSimple             (bool partial_ok = false);             // see if a list can be made into a compiled version
 
     void        ExecuteAndClean             (long);
 
@@ -117,9 +119,9 @@ public:
     _String     TrimNameSpaceFromID         (_String&);
   
     bool        has_stdin_redirect         (void) const {return stdinRedirect != nil;}
-    bool        has_keyword_arguments      (void) const {return kwargs && kwargs -> countitems() || kwarg_tags && kwarg_tags->countitems();}
+    bool        has_keyword_arguments      (void) const {return (kwargs && kwargs -> countitems()) || (kwarg_tags && kwarg_tags->countitems());}
   
-    _String*    FetchFromStdinRedirect     (_String const * dialog_tag = nil, bool handle_multi_choice = false);
+    _String*    FetchFromStdinRedirect     (_String const * dialog_tag = nil, bool handle_multi_choice = false, bool do_echo = false);
     
     _ElementaryCommand* FetchLastCommand (void) {
         if (currentCommand - 1 < lLength && currentCommand > 0) {
@@ -135,7 +137,7 @@ public:
         currentCommand = MAX(currentCommand,lLength-1);
     }
     
-    _StringBuffer const GenerateHelpMessage         (void) const;
+    _StringBuffer const GenerateHelpMessage         (_AVLList * scanned_functions = nil) const;
     
     bool        IsErrorState    (void)     {
             return errorState;
@@ -167,6 +169,10 @@ public:
 
     /** Advance program counter */
     void      advance (void) {currentCommand ++;}
+    
+    bool      is_compiled (long idx = -1) const {if (cli) if (idx < 0L) return true; else return cli->is_compiled[idx]; return false;}
+    
+    void      CopyCLIToVariables (void);
   
     // data fields
     // _____________________________________________________________
@@ -375,7 +381,9 @@ public:
   
     bool              DecompileFormulae        (void);
   
-    void              BuildListOfDependancies  (_AVLListX & collection, bool recursive, _ExecutionList& chain);
+    void              BuildListOfDependancies  (_AVLListX & collection, bool recursive, _ExecutionList const& chain);
+    
+    
     
     /**
      
@@ -392,7 +400,7 @@ public:
 
 protected:
   
-    static    void ScanStringExpressionForHBLFunctions (_String*, _ExecutionList&, bool, _AVLListX& );
+    static    void ScanStringExpressionForHBLFunctions (_String*, _ExecutionList const&, bool, _AVLListX& );
 
     _String  *   GetIthParameter       (unsigned long i, bool range_check = true) const {
         BaseRef p = parameters.GetItemRangeCheck(i);

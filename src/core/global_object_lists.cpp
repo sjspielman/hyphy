@@ -374,12 +374,12 @@ namespace hyphy_global_objects {
   //____________________________________________________________________________________
   
   bool    IsModelReversible (long mid) {
-    _Matrix *m = nil,
-    *f = nil;
+    _Variable *m = nil,
+              *f = nil;
     bool    mbf;
     RetrieveModelComponents (mid, m, f, mbf);
     if (m&&f) {
-      return m->IsReversible(mbf?nil:f);
+        return ((_Matrix*)m->GetValue())->IsReversible(mbf?nil:(_Matrix*)f->GetValue());
     }
     return false;
   }
@@ -388,7 +388,7 @@ namespace hyphy_global_objects {
   
   bool    IsModelOfExplicitForm (long modelID) {
     if (modelID != HY_NO_MODEL) {
-      return modelTypeList.lData[modelID] != 0;
+      return modelTypeList.list_data[modelID] != 0;
     }
     return false;
   }
@@ -579,9 +579,9 @@ namespace hyphy_global_objects {
                     *index = loc;
                 }
                 if (IsModelOfExplicitForm(loc)) {
-                    return (BaseRef)modelMatrixIndices.lData[loc];
+                    return (BaseRef)modelMatrixIndices.list_data[loc];
                 }
-                return LocateVar (modelMatrixIndices.lData[loc]);
+                return LocateVar (modelMatrixIndices.list_data[loc]);
             }
         }
         
@@ -599,6 +599,7 @@ namespace hyphy_global_objects {
         if (type & HY_BL_TREE) {
             _Variable* tree_var = FetchVar (LocateVarByName(name));
             if (tree_var && tree_var->ObjectClass() == TREE) {
+                type = HY_BL_TREE;
                 return tree_var;
             }
         }
@@ -701,9 +702,9 @@ namespace hyphy_global_objects {
                     *index = loc;
                 }
                 if (IsModelOfExplicitForm(loc)) {
-                    return (BaseRef)modelMatrixIndices.lData[loc];
+                    return (BaseRef)modelMatrixIndices.list_data[loc];
                 }
-                return LocateVar (modelMatrixIndices.lData[loc]);
+                return LocateVar (modelMatrixIndices.list_data[loc]);
             }
         }
         

@@ -78,7 +78,7 @@ namespace hy_global {
    @return a pointer to the new memory block
    
    */
-  hyPointer   MemAllocate (long bytes, bool zero = false);
+  hyPointer   MemAllocate (long bytes, bool zero = false, size_t alignment = 0);
   
   /**
    Resize an existing pointer to 'new_bytes' bytes.
@@ -201,7 +201,7 @@ namespace hy_global {
    @param message the error message
    @param force_exit force application exit
    */
-  void      HandleApplicationError (_String const & message, bool force_exit = false);
+  void      HandleApplicationError (_String const & message, bool force_exit = false, bool dump_core = false);
   
   /**
       When HyPhy encounters an error in a particular expression, it may be useful
@@ -233,7 +233,7 @@ namespace hy_global {
    */
   
   
-  bool  ProcessFileName (_String & path, bool isWrite = false, bool acceptStringVars = false, hyPointer = nil, bool assume_platform_specific = false, _ExecutionList * caller = nil, bool relative_to_base = false);
+  bool  ProcessFileName (_String & path, bool isWrite = false, bool acceptStringVars = false, hyPointer = nil, bool assume_platform_specific = false, _ExecutionList * caller = nil, bool relative_to_base = false, bool relative_path_passthrough = false);
   
   void    ConsoleLog (void);
   

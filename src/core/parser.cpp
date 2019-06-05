@@ -117,10 +117,7 @@ hyFloat  tolerance  = DBL_EPSILON;
 //__________________________________________________________________________________
 void            DeleteTreeVariable      (long, _SimpleList &, bool);
 
-//__________________________________________________________________________________
-_Variable * LocateVar (long index) {
-    return (_Variable *)(((BaseRef*)variablePtrs.lData)[index]);
-}
+
 
 //__________________________________________________________________________________
 void     parameterToCharBuffer (hyFloat value, char* dump, long length, bool json)
@@ -171,7 +168,7 @@ void SplitVariableIDsIntoLocalAndGlobal (const _SimpleList& theList, _List& spli
     splitStorage.AppendNewInstance(new _SimpleList);
 
     for (unsigned long k=0; k<theList.lLength; k++) {
-        long varID = theList.lData[k];
+        long varID = theList.list_data[k];
         (*(_SimpleList*)splitStorage(1-LocateVar (varID)->IsGlobal())) << varID;
     }
 }
@@ -332,10 +329,10 @@ void       UpdateChangingFlas (long vN) {
     _SimpleList * toDelete = nil;
 
     for (long k = 0L; k<topLimit; k++) {
-        long g = ((_SimpleList*)compiledFormulaeParameters.lData[k])->BinaryFind (vN,0);
+        long g = ((_SimpleList*)compiledFormulaeParameters.list_data[k])->BinaryFind (vN,0);
 
         if (g>=0) {
-            ((_ElementaryCommand*)listOfCompiledFormulae.lData[k])->DecompileFormulae();
+            ((_ElementaryCommand*)listOfCompiledFormulae.list_data[k])->DecompileFormulae();
           
 
             if (!toDelete) {
@@ -361,10 +358,10 @@ void       UpdateChangingFlas (_SimpleList & involvedVariables)
     _SimpleList * toDelete         = nil;
 
     for (long k = 0; k<topLimit; k++) {
-        long g = ((_SimpleList*)compiledFormulaeParameters.lData[k])->CountCommonElements (involvedVariables,true);
+        long g = ((_SimpleList*)compiledFormulaeParameters.list_data[k])->CountCommonElements (involvedVariables,true);
 
         if (g>0) {
-            ((_ElementaryCommand*)listOfCompiledFormulae.lData[k])->DecompileFormulae();
+            ((_ElementaryCommand*)listOfCompiledFormulae.list_data[k])->DecompileFormulae();
 
             if (!toDelete) {
                 toDelete = new _SimpleList;
@@ -667,7 +664,6 @@ void  InsertVar (_Variable* theV) {
             HandleApplicationError(_String("Error while creating a tree: duplicate node name ") & *theV->GetName()->Enquote());
             return;
         }
-
         theV->theIndex = variableNames.GetXtra(-pos-1);
         return;
     } else {
@@ -675,7 +671,7 @@ void  InsertVar (_Variable* theV) {
     }
 
     if (freeSlots.lLength) {
-        theV->theIndex = freeSlots.lData[freeSlots.lLength-1];
+        theV->theIndex = freeSlots.list_data[freeSlots.lLength-1];
         variablePtrs[theV->theIndex]=theV->makeDynamic();
         freeSlots.Delete(freeSlots.lLength-1);
     } else {
@@ -730,7 +726,7 @@ void  RenameVariable (_String* oldName, _String* newName)
     }
 
     for (unsigned long k = 0; k < toRename.lLength; k++) {
-        _Variable * thisVar = FetchVar (xtras.lData[k]);
+        _Variable * thisVar = FetchVar (xtras.list_data[k]);
         thisVar->GetName()->RemoveAReference();
         if (k) {
             thisVar->theName = new _String(thisVar->GetName()->Replace(oldNamePrefix,newNamePrefix,true));
@@ -739,7 +735,7 @@ void  RenameVariable (_String* oldName, _String* newName)
         }
 
         variableNames.Delete (toRename (k), true);
-        variableNames.Insert (thisVar->GetName(),xtras.lData[k]);
+        variableNames.Insert (thisVar->GetName(),xtras.list_data[k]);
         thisVar->GetName()->AddAReference();
     }
 }

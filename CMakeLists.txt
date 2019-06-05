@@ -1,7 +1,9 @@
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.12)
 project(HyPhy)
 cmake_policy(VERSION 3.0.0)
-cmake_policy(SET CMP0026 OLD)
+#cmake_policy(SET CMP0026 OLD)
+#cmake_policy(SET CMP0004 OLD)
+
 
 set(CMAKE_CONFIGURATION_TYPES Release)
 
@@ -20,12 +22,14 @@ macro(PCL_CHECK_FOR_SSE3)
   include(CheckCXXSourceRuns)
   set(CMAKE_REQUIRED_FLAGS)
 
-  if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG)
+  #if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG)
       set(CMAKE_REQUIRED_FLAGS "-msse3")
-  endif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG)
+  #endif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG)
 
   check_cxx_source_runs("
       #include <pmmintrin.h>
+      #include <stdio.h>
+
       int main ()
       {
           __m128d a, b;
@@ -33,6 +37,7 @@ macro(PCL_CHECK_FOR_SSE3)
           a = _mm_loadu_pd (vals);
           b = _mm_hadd_pd (a,a);
           _mm_storeu_pd (vals, b);
+          printf (\"%g\", vals[0]);
           return (0);
       }"
       HAVE_SSE3_EXTENSIONS)
@@ -46,12 +51,14 @@ macro(PCL_CHECK_FOR_AVX)
   include(CheckCXXSourceRuns)
   set(CMAKE_REQUIRED_FLAGS)
 
-  if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG)
-      set(CMAKE_REQUIRED_FLAGS "-march=corei7-avx -mtune=corei7-avx")
-  endif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG)
+  #if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG)
+      set(CMAKE_REQUIRED_FLAGS "-mavx")
+  #endif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG)
 
   check_cxx_source_runs("
       #include <immintrin.h>
+      #include <stdio.h>
+
       int main ()
       {
           __m256d a, b;
@@ -59,10 +66,42 @@ macro(PCL_CHECK_FOR_AVX)
           a = _mm256_loadu_pd (vals);
           b = _mm256_hadd_pd (a,a);
           _mm256_storeu_pd (vals, b);
+          printf (\"%g\", vals[0]);
           return (0);
       }"
       HAVE_AVX_EXTENSIONS)
 endmacro(PCL_CHECK_FOR_AVX)
+
+#-------------------------------------------------------------------------------
+# FMA3 MACROS
+#-------------------------------------------------------------------------------
+
+macro(PCL_CHECK_FOR_FMA3)
+    include(CheckCXXSourceRuns)
+    set(CMAKE_REQUIRED_FLAGS)
+
+    #if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG)
+        set(CMAKE_REQUIRED_FLAGS "-mavx -mfma ")
+    #endif(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX OR CMAKE_COMPILER_IS_CLANG)
+
+    check_cxx_source_runs("
+    #include <immintrin.h>
+    #include <stdio.h>
+
+    int main ()
+    {
+        __m256d a, b, c;
+        double vals[4] = {2.};
+        a = _mm256_loadu_pd (vals);
+        b = _mm256_loadu_pd (vals);
+        c = _mm256_loadu_pd (vals);
+        a = _mm256_fmadd_pd      (a, b, c);
+        _mm256_storeu_pd (vals, a);
+        printf (\"%g\", vals[0]);
+        return 0;
+    }"
+    HAVE_FMA3)
+endmacro(PCL_CHECK_FOR_FMA3)
 
 
 #-------------------------------------------------------------------------------
@@ -84,8 +123,9 @@ set(SRC_SQLITE3 contrib/SQLite-3.8.2/sqlite3.c)
 set(SRC_UNIXMAIN src/mains/unix.cpp)
 set(SRC_UTILS src/utils/hyphyunixutils.cpp)
 
-set(SRC_COMMON ${SRC_CORE} ${SRC_NEW} ${SRC_SQLITE3} ${SRC_UTILS} ${SRC_CONTRIB})
 
+set(SRC_COMMON ${SRC_CORE} ${SRC_NEW} ${SRC_SQLITE3} ${SRC_UTILS} ${SRC_CONTRIB})
+set_source_files_properties(${SRC_CORE} ${SRC_NEW} {SRC_UTILS} PROPERTIES COMPILE_FLAGS "-Weffc++ -Wextra -Wall")
 
 #-------------------------------------------------------------------------------
 # make it fast, scotty
@@ -126,8 +166,13 @@ if(CMAKE_COMPILER_IS_GNUCC OR CMAKE_COMPILER_IS_GNUCXX)
     else(NOAVX)
        PCL_CHECK_FOR_AVX()
        if(${HAVE_AVX_EXTENSIONS})
-            set(DEFAULT_COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} -march=corei7-avx -mtune=corei7-avx")
+            set(DEFAULT_COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} -march=native -mtune=native -mavx")
             add_definitions (-D_SLKP_USE_AVX_INTRINSICS)
+            PCL_CHECK_FOR_FMA3()
+            if (${HAVE_FMA3})
+                set(DEFAULT_COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS}  -mfma")
+                add_definitions (-D_SLKP_USE_FMA3_INTRINSICS)
+            endif (${HAVE_FMA3})
         else(${HAVE_AVX_EXTENSIONS})
             PCL_CHECK_FOR_SSE3()
             if(${HAVE_SSE3_EXTENSIONS})
@@ -145,8 +190,13 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(DEFAULT_COMPILE_FLAGS "-fsigned-char -O3")
     PCL_CHECK_FOR_AVX()
     if(${HAVE_AVX_EXTENSIONS})
-        set(DEFAULT_COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} -march=corei7-avx -mtune=corei7-avx")
+        set(DEFAULT_COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} -march=native -mtune=native -mavx")
         add_definitions (-D_SLKP_USE_AVX_INTRINSICS)
+        PCL_CHECK_FOR_FMA3()
+        if (${HAVE_FMA3})
+            set(DEFAULT_COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} -mfma")
+            add_definitions (-D_SLKP_USE_FMA3_INTRINSICS)
+        endif (${HAVE_FMA3})
     else(${HAVE_AVX_EXTENSIONS})
         PCL_CHECK_FOR_SSE3()
         if(${HAVE_SSE3_EXTENSIONS})
@@ -161,7 +211,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     )
 endif (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 
-set(DEFAULT_COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} -g ")
+set(DEFAULT_COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS}  ")
 MESSAGE ("Set compiler flags to ${DEFAULT_COMPILE_FLAGS}")
 
 if(NOT DEFINED DEFAULT_COMPILE_FLAGS)
@@ -171,6 +221,8 @@ endif(NOT DEFINED DEFAULT_COMPILE_FLAGS)
 if(NOT DEFINED DEFAULT_LINK_FLAGS)
     set(DEFAULT_LINK_FLAGS "")
 endif(NOT DEFINED DEFAULT_LINK_FLAGS)
+
+set(DEFAULT_LINK_FLAGS "${DEFAULT_LINK_FLAGS}  ")
 
 if(NOT DEFINED DEFAULT_WARNING_FLAGS)
     set(DEFAULT_WARNING_FLAGS "")
@@ -182,10 +234,6 @@ endif(NOT DEFINED DEFAULT_WARNING_FLAGS)
 #-------------------------------------------------------------------------------
 find_package(OpenMP)
 
-if(NOT ${OPENMP_FOUND})
-    set(OpenMP_CXX_FLAGS "")
-endif(NOT ${OPENMP_FOUND})
-
 #-------------------------------------------------------------------------------
 # default installation prefix
 #-------------------------------------------------------------------------------
@@ -195,10 +243,11 @@ endif()
 if(NOT DEFINED INSTALL_PREFIX)
     set(INSTALL_PREFIX ${CMAKE_INSTALL_PREFIX} CACHE INTERNAL "Installation prefix" FORCE)
 endif()
+
 if(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
-    set(DEFAULT_LIBRARIES pthread)
+	set(DEFAULT_LIBRARIES )
 else(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
-    set(DEFAULT_LIBRARIES dl pthread)
+    set(DEFAULT_LIBRARIES dl)
 endif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
 
 #-------------------------------------------------------------------------------
@@ -206,7 +255,11 @@ endif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
 #-------------------------------------------------------------------------------
 find_package(CURL)
 if(${CURL_FOUND} AND NOT APPLE)
-    set(DEFAULT_LIBRARIES dl pthread crypto curl ssl)
+    if(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+        set(DEFAULT_LIBRARIES crypto curl ssl)
+    else(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
+        set(DEFAULT_LIBRARIES dl crypto curl ssl)
+    endif(CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
     add_definitions (-D__HYPHYCURL__)
 endif(${CURL_FOUND} AND NOT APPLE)
 
@@ -232,7 +285,15 @@ add_custom_target(uninstall
     COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
 )
 
-
+find_program(NODE npm)
+if(NOT NODE)
+    message("Node not installed; API documentation will not be generated")
+else(NOT NODE)
+    add_custom_target(
+        docs ALL
+        rm -rf ./docs && npm install -g documentation@4 && documentation build --polyglot -f md ./res/TemplateBatchFiles/libv3/**/*.bf -o ./docs.md
+    )
+endif(NOT NODE)
 
 
 #-------------------------------------------------------------------------------
@@ -263,9 +324,6 @@ set_property(
 #-------------------------------------------------------------------------------
 add_definitions(-D_SLKP_LFENGINE_REWRITE_ -D__AFYP_REWRITE_BGM__)
 
-if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    add_definitions(-D__HYPHY_64__)
-endif(CMAKE_SIZEOF_VOID_P EQUAL 8)
 
 include_directories(
     src/core/include
@@ -286,64 +344,24 @@ install(DIRECTORY res/ DESTINATION lib/hyphy)
 # HYPHYMP target
 #-------------------------------------------------------------------------------
 add_executable(
-    HYPHYMP
-    EXCLUDE_FROM_ALL
+    hyphy
     ${SRC_COMMON} ${SRC_UNIXMAIN}
 )
 
-target_link_libraries(HYPHYMP ${DEFAULT_LIBRARIES})
+if(${OPENMP_FOUND})
+    target_link_libraries(hyphy PRIVATE ${DEFAULT_LIBRARIES} OpenMP::OpenMP_CXX)
+else(${OPENMP_FOUND})
+    target_link_libraries(hyphy PRIVATE ${DEFAULT_LIBRARIES})
+endif(${OPENMP_FOUND})
 
-add_custom_target(MP DEPENDS HYPHYMP)
+add_custom_target(MP DEPENDS hyphy)
 
 install(
-    TARGETS HYPHYMP
+    TARGETS hyphy
     RUNTIME DESTINATION bin
     OPTIONAL
 )
 
-#-------------------------------------------------------------------------------
-# hyphy OpenCL target
-#-------------------------------------------------------------------------------
-find_package(OpenCL)
-if(${OPENCL_FOUND})
-
-    add_executable(
-        HYPHYOCL
-        EXCLUDE_FROM_ALL
-        ${SRC_COMMON} ${SRC_UNIXMAIN} ${CMAKE_CURRENT_BINARY_DIR}/src/ocl/opencl_kernels.h
-    )
-
-    include_directories(${OPENCL_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/src/ocl)
-    target_link_libraries(HYPHYOCL ${DEFAULT_LIBRARIES} ${OPENCL_LIBRARIES})
-
-    install(
-        TARGETS HYPHYOCL
-        RUNTIME DESTINATION bin
-        OPTIONAL
-    )
-
-    add_custom_target(OCL DEPENDS HYPHYOCL)
-    set_property(
-        TARGET HYPHYOCL
-        APPEND PROPERTY COMPILE_DEFINITIONS __MP__ __MP2__ __UNIX__ _HY_GPU_EXAMPLE_CALCULATOR MDSOCL
-    )
-    set_target_properties(
-        HYPHYOCL
-        PROPERTIES
-        COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_WARNING_FLAGS}"
-        LINK_FLAGS "${DEFAULT_LINK_FLAGS}"
-    )
-    add_executable(
-        cl2hdr
-        EXCLUDE_FROM_ALL
-        contrib/cl2hdr.c
-    )
-    add_custom_command(
-        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/src/ocl/opencl_kernels.h
-        COMMAND cl2hdr ${CMAKE_CURRENT_SOURCE_DIR}/src/ocl/opencl_kernels.cl ${CMAKE_CURRENT_BINARY_DIR}/src/ocl/opencl_kernels.h
-        DEPENDS cl2hdr ${CMAKE_CURRENT_SOURCE_DIR}/src/ocl/opencl_kernels.cl
-    )
-endif(${OPENCL_FOUND})
 
 
 #-------------------------------------------------------------------------------
@@ -361,7 +379,11 @@ if(${MPI_FOUND})
 
     include_directories(${MPI_INCLUDE_PATH})
 
-    target_link_libraries(HYPHYMPI ${DEFAULT_LIBRARIES} ${MPI_LIBRARIES})
+    if(${OPENMP_FOUND})
+        target_link_libraries(HYPHYMPI ${DEFAULT_LIBRARIES} ${MPI_LIBRARIES} OpenMP::OpenMP_CXX)
+    else(${OPENMP_FOUND})
+        target_link_libraries(HYPHYMPI ${DEFAULT_LIBRARIES} ${MPI_LIBRARIES})
+    endif(${OPENMP_FOUND})
 
     install(
         TARGETS HYPHYMPI
@@ -377,13 +399,72 @@ if(${MPI_FOUND})
         APPEND PROPERTY COMPILE_DEFINITIONS __HYPHYMPI__ __UNIX__ _HYPHY_LIBDIRECTORY_="${CMAKE_INSTALL_PREFIX}/lib/hyphy"
     )
 
+    message ("${DEFAULT_LINK_FLAGS} ${MPI_LINK_FLAGS} ${OpenMP_CXX_FLAGS}")
+
     set_target_properties(
         HYPHYMPI
         PROPERTIES
-        COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_WARNING_FLAGS} ${MPI_COMPILE_FLAGS} ${OpenMP_CXX_FLAGS}"
-        LINK_FLAGS "${DEFAULT_LINK_FLAGS} ${MPI_LINK_FLAGS} ${OpenMP_CXX_FLAGS}"
+        if(${OPENMP_FOUND})
+            COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_WARNING_FLAGS} ${MPI_COMPILE_FLAGS} ${OpenMP_CXX_FLAGS}"
+            LINK_FLAGS "${DEFAULT_LINK_FLAGS} ${MPI_LINK_FLAGS} ${OpenMP_CXX_FLAGS}"
+        else(${OPENMP_FOUND})
+            COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_WARNING_FLAGS} ${MPI_COMPILE_FLAGS}"
+            LINK_FLAGS "${DEFAULT_LINK_FLAGS} ${MPI_LINK_FLAGS}"
+        endif(${OPENMP_FOUND})
     )
 endif(${MPI_FOUND})
+
+#-------------------------------------------------------------------------------
+# hyphy profile target
+#-------------------------------------------------------------------------------
+add_executable(
+    HYPHY-PROFILE
+    EXCLUDE_FROM_ALL
+    ${SRC_COMMON} ${SRC_UNIXMAIN}
+)
+
+if(${OPENMP_FOUND})
+    target_link_libraries(HYPHY-PROFILE ${DEFAULT_LIBRARIES} OpenMP::OpenMP_CXX)
+else(${OPENMP_FOUND})
+    target_link_libraries(HYPHY-PROFILE ${DEFAULT_LIBRARIES})
+endif(${OPENMP_FOUND})
+
+add_custom_target(PROFILE DEPENDS HYPHY-PROFILE)
+
+
+set_target_properties(
+    HYPHY-PROFILE
+    PROPERTIES
+    if(${OPENMP_FOUND})
+        COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} ${OpenMP_CXX_FLAGS} -g -fprofile-instr-generate -fcoverage-mapping "
+        LINK_FLAGS "${DEFAULT_COMPILE_FLAGS} ${OpenMP_CXX_FLAGS} -g -fprofile-instr-generate "
+    else(${OPENMP_FOUND})
+        COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS}-g -fprofile-instr-generate -fcoverage-mapping "
+        LINK_FLAGS "${DEFAULT_COMPILE_FLAGS} -g  -fprofile-instr-generate "
+    endif(${OPENMP_FOUND})
+)
+
+#-------------------------------------------------------------------------------
+ # hyphy profile target
+ #-------------------------------------------------------------------------------
+ add_executable(
+     HYPHY-GPERF
+     EXCLUDE_FROM_ALL
+     ${SRC_COMMON} ${SRC_UNIXMAIN}
+ )
+
+  target_link_libraries(HYPHY-PROFILE ${DEFAULT_LIBRARIES})
+
+  add_custom_target(GPERF DEPENDS HYPHY-GPERF)
+
+
+  set_target_properties(
+     HYPHY-GPERF
+     PROPERTIES
+          COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} -g  "
+         LINK_FLAGS "${DEFAULT_COMPILE_FLAGS} -g  -L/usr/local/Cellar/gperftools/2.7/lib/ -lprofiler -ltcmalloc  "
+     endif(${OPENMP_FOUND})
+ )
 
 
 #-------------------------------------------------------------------------------
@@ -395,7 +476,12 @@ add_executable(
     ${SRC_COMMON} ${SRC_UNIXMAIN}
 )
 
-target_link_libraries(HYPHYDEBUG ${DEFAULT_LIBRARIES})
+if(${OPENMP_FOUND})
+    target_link_libraries(HYPHYDEBUG ${DEFAULT_LIBRARIES} OpenMP::OpenMP_CXX)
+else(${OPENMP_FOUND})
+    target_link_libraries(HYPHYDEBUG ${DEFAULT_LIBRARIES})
+endif(${OPENMP_FOUND})
+
 add_custom_target(DEBUG DEPENDS HYPHYDEBUG)
 
 
@@ -403,8 +489,13 @@ add_custom_target(DEBUG DEPENDS HYPHYDEBUG)
 set_target_properties(
     HYPHYDEBUG
     PROPERTIES
-    COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_DEBUG_WARNING_FLAGS} ${OpenMP_CXX_FLAGS} -g -fsanitize=address -O0 "
-    LINK_FLAGS "${DEFAULT_COMPILE_FLAGS} ${OpenMP_CXX_FLAGS} -g -fsanitize=address -O0 "
+    if(${OPENMP_FOUND})
+        COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_DEBUG_WARNING_FLAGS} ${OpenMP_CXX_FLAGS} -g -fsanitize=address -fsanitize=leak -O0 "
+        LINK_FLAGS "${DEFAULT_COMPILE_FLAGS} ${OpenMP_CXX_FLAGS} -g -fsanitize=address -O0 "
+    else(${OPENMP_FOUND})
+        COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_DEBUG_WARNING_FLAGS} -g -fsanitize=address -fsanitize=leak -O0 "
+        LINK_FLAGS "${DEFAULT_COMPILE_FLAGS} -g -fsanitize=address -O0 "
+    endif(${OPENMP_FOUND})
 )
 
 
@@ -428,8 +519,13 @@ set_property(
 set_target_properties(
     HYPHYGTEST
     PROPERTIES
-    COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_DEBUG_WARNING_FLAGS} ${OpenMP_CXX_FLAGS} -msse3 -g -fprofile-arcs -ftest-coverage -pg"
-    LINK_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_DEBUG_WARNING_FLAGS} ${OpenMP_CXX_FLAGS} -msse3 -g -fprofile-arcs -ftest-coverage -pg"
+    if(${OPENMP_FOUND})
+        COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_DEBUG_WARNING_FLAGS} ${OpenMP_CXX_FLAGS} -msse3 -g -fprofile-arcs -ftest-coverage -pg"
+        LINK_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_DEBUG_WARNING_FLAGS} ${OpenMP_CXX_FLAGS} -msse3 -g -fprofile-arcs -ftest-coverage -pg"
+    else(${OPENMP_FOUND})
+        COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_DEBUG_WARNING_FLAGS} -msse3 -g -fprofile-arcs -ftest-coverage -pg"
+        LINK_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_DEBUG_WARNING_FLAGS} -msse3 -g -fprofile-arcs -ftest-coverage -pg"
+    endif(${OPENMP_FOUND})
 )
 
 
@@ -439,20 +535,26 @@ set_target_properties(
 
 if(UNIX)
     set_property(
-        TARGET HYPHYMP HYPHYGTEST HYPHYDEBUG
+        TARGET hyphy HYPHYGTEST HYPHYDEBUG HYPHY-PROFILE HYPHY-GPERF
         APPEND PROPERTY COMPILE_DEFINITIONS __UNIX__
     )
 endif(UNIX)
 
 set_property(
-    TARGET HYPHYMP
+    TARGET hyphy
     APPEND PROPERTY COMPILE_DEFINITIONS __MP__ __MP2__
 )
 
 set_property(
-    TARGET HYPHYMP HYPHYGTEST HYPHYDEBUG
+    TARGET hyphy HYPHYGTEST HYPHYDEBUG
     APPEND PROPERTY COMPILE_DEFINITIONS _HYPHY_LIBDIRECTORY_="${CMAKE_INSTALL_PREFIX}/lib/hyphy"
 )
+
+set_property(
+    TARGET hyphy HYPHYGTEST HYPHYDEBUG HYPHY-PROFILE
+    APPEND PROPERTY COMPILE_DEFINITIONS _HYPHY_LIBDIRECTORY_="${CMAKE_INSTALL_PREFIX}/lib/hyphy"
+)
+
 
 set_property(
     TARGET HYPHYDEBUG HYPHYGTEST
@@ -460,9 +562,20 @@ set_property(
 )
 
 set_target_properties(
-    HYPHYMP
+    hyphy
     PROPERTIES
-    COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_WARNING_FLAGS} ${OpenMP_CXX_FLAGS}"
-    LINK_FLAGS "${DEFAULT_LINK_FLAGS} ${OpenMP_CXX_FLAGS}"
+    if(${OPENMP_FOUND})
+        COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_WARNING_FLAGS} ${OpenMP_CXX_FLAGS} -g "
+        LINK_FLAGS "${DEFAULT_LINK_FLAGS} ${OpenMP_CXX_FLAGS} -g "
+    else(${OPENMP_FOUND})
+        COMPILE_FLAGS "${DEFAULT_COMPILE_FLAGS} ${DEFAULT_WARNING_FLAGS} -g "
+        LINK_FLAGS "${DEFAULT_LINK_FLAGS} -g "
+    endif(${OPENMP_FOUND})
 )
+
+macro(makeLink src dest target)
+  add_custom_command(TARGET ${target} POST_BUILD
+    COMMAND ln -sf ${dest} ${src} DEPENDS ${dest} COMMENT "mklink ${src} -> ${dest}")
+endmacro()
+makeLink(HYPHYMP hyphy hyphy)
 

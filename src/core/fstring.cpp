@@ -626,6 +626,17 @@ HBLObjectRef _FString::ExecuteSingleOp (long opCode, _List* arguments, _hyExecut
         return EqualRegExp(arg0);
       case HY_OP_CODE_MOD: // % equal case insenstive
         return AreEqualCIS(arg0);
+            
+      case HY_OP_CODE_MIN: {// resolve file path
+          hyFloat local_resolve = 0.0;
+          if (arg0->ObjectClass () == NUMBER) {
+              local_resolve = arg0->Value();
+          }
+          _String value = get_str();
+          ProcessFileName (value, false, false, (hyPointer) (context ? context->GetContext() : nil), false, nil, !CheckEqual(local_resolve,0.0));
+          return new _FString (value, false);
+      }
+            
       case HY_OP_CODE_AND: { // && upcase or lowercase
         hyFloat pVal = 0.0;
         if (arg0->ObjectClass () == NUMBER) {
@@ -893,7 +904,7 @@ HBLObjectRef   _FString::CountGlobalObjects (void)
         if (get_str() == hy_env::last_model_parameter_list) {
             if (lastMatrixDeclared>=0) {
               res =  PopulateAndSort ([&] (_AVLList & parameter_list) -> void  {
-                LocateVar (modelMatrixIndices.lData[lastMatrixDeclared])->ScanForVariables(parameter_list, false);
+                LocateVar (modelMatrixIndices.list_data[lastMatrixDeclared])->ScanForVariables(parameter_list, false);
               }).countitems();
             }
         }

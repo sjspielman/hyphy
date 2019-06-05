@@ -166,7 +166,6 @@ protected:
     
   
     virtual void _RemoveNodeList (_SimpleList const& list);
-    static const _String kMeta;
 
 public:
     // class constants
@@ -174,7 +173,8 @@ public:
     static const _String kCompareEqualWithReroot,
                          kCompareEqualWithoutReroot,
                          kCompareUnequalToplogies,
-                         kCompareUnequalLabelSets;
+                         kCompareUnequalLabelSets,
+                         kMeta;
 
     node<long>      *theRoot;
   
@@ -198,7 +198,7 @@ public:
     virtual  _FString*      Compare                             (HBLObjectRefConst) const;
     virtual  BaseRef        makeDynamic                         (void) const;
     node<long>* CopyTreeStructure                   (node<long>*, bool) const;
-    virtual  const _String           FinalizeNode                        (node<long>*, long, _String, _String const&, _String&, _TreeTopologyParseSettings const & settings);
+    virtual  _String           FinalizeNode                        (node<long>*, long, _String, _String const&, _String&, _TreeTopologyParseSettings const & settings);
 
 
     virtual HBLObjectRef       ExecuteSingleOp                     (long, _List* = nil, _hyExecutionContext* context = _hyDefaultExecutionContext);

@@ -8,6 +8,7 @@ src/ocl/opencl_kernels.h
 tags
 .ctags
 *.plist
+.vscode/
 
 # CMake generated files
 CMakeCache.txt
@@ -22,6 +23,7 @@ HyPhy.xcodeproj
 
 
 # HYPHY binaries
+hyphy
 HYPHYMP
 HYPHYMPI
 HyPhy.app
@@ -45,7 +47,14 @@ messages.log
 errors.log
 tests/hbltests/libv3/data/CD2.nex.*.json
 tests/hbltests/data/tempFileTesting*
+tempOutput.txt
+tests/hbltests/data/CD2*.json
+testMethodOutput
+tests/hbltests/data/CD2*.cache
+test
 
 
 #Utility function
-remake_hyphymp.sh
+remake_hyphy.sh
+remake_hyphydebug.sh
+

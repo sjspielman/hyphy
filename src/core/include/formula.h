@@ -72,6 +72,20 @@ class   _Formula {
 
     friend class _Variable;
     friend class _VariableContainer;
+    
+protected:
+
+    unsigned    long    call_count;
+    HBLObjectRef        recursion_calls;
+    _List*              resultCache;
+    _Stack              theStack;
+    _List               theFormula;
+
+    node<long>* theTree; // this formula converted to a tree for operation purposes
+    // such as simplification, differentiation and printing.
+    // trees store numbers referencing operations inside
+    // "theFormula"
+
 
 public:
     _Formula (void);
@@ -120,6 +134,7 @@ public:
     void        DuplicateReference          (const _Formula*);
     virtual BaseRef     makeDynamic         (void) const;
     virtual BaseRef     toStr               (_hyFormulaStringConversionMode mode, _List* matchNames = nil, bool = false);
+    _StringBuffer const     toRPN               (_hyFormulaStringConversionMode mode, _List* matchNames = nil);
 
     virtual long        ObjectClass         (void);
 
@@ -241,18 +256,6 @@ protected:
     bool        CheckSimpleTerm     (HBLObjectRef);
     node<long>* DuplicateFormula    (node<long>*,_Formula&) const;
 
-    _List       theFormula,
-                *resultCache;
-
-    _Stack      theStack;
-    HBLObjectRef   recursion_calls;
-
-    unsigned    long call_count;
-
-    node<long>* theTree; // this formula converted to a tree for operation purposes
-    // such as simplification, differentiation and printing.
-    // trees store numbers referencing operations inside
-    // "theFormula"
 
 };
 

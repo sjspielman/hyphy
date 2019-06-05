@@ -85,6 +85,48 @@ struct      _CompiledMatrixData {
 /*__________________________________________________________________________________________________________________________________________ */
 
 class       _Matrix: public _MathObject {
+    
+// data members
+public:
+    hyFloat   *theData;                            // matrix elements
+    
+protected:
+    
+    // data
+    
+    long        hDim, vDim, lDim;               // matrix physical dimensions; lDim - length of
+    // actual storage allocated
+    
+    long*       theIndex;                       // indices of matrix elements in logical storage
+    
+private:
+    
+    long        storageType,                    // true element matrix(1) or a matrix of pointers(0) which do not need to be deleted
+    // 2, if elements of the matrix are actually formulas which must be initialized to numerics before use
+    // matrices of type two are merely storage tables and can not be operated on directly, i.e their
+    // numerical values are computed first
+                bufferPerRow,                   // values reflecting internal storage structure for
+                overflowBuffer,                 // sparse matrices
+                allocationBlock;
+    
+    _CompiledMatrixData*
+    cmd;
+    
+    HBLObjectRef   theValue;                       // stores evaluated values of the matrix
+
+    static      int     storageIncrement,       // how many percent of full matrix size
+    // to allocate to the matrix storage per increment
+    
+                        precisionArg,                    // how many elements in exp series to truncate after
+    
+                        switchThreshold;                 // maximum percentage of non-zero elements
+    // to keep the matrix sparse
+    
+    static      hyFloat truncPrecision;
+    
+    // matrix exp truncation precision
+    
+ 
 
 public:
 
@@ -92,7 +134,7 @@ public:
 
     _Matrix ();                                 // default constructor, doesn't do much
 
-    _Matrix (_String const&, bool = false, _VariableContainer const* = nil);
+    _Matrix (_String const&, bool, _FormulaParsingContext&);
     // matrix from a string of the form
     // {{i11,i12,...}{i21,i22,..}{in1,in2..)})
     // or {# rows,<# cols>{i1,j1,expr}{i2,j2,expr}..}
@@ -144,14 +186,18 @@ public:
     virtual void        Serialize (_StringBuffer&,_String&);
     // write the matrix definition in HBL
 
-    virtual bool        is_empty (void) const;
-    virtual bool        is_row (void) const;
-    virtual bool        is_column (void) const;
-    virtual bool        is_square (void) const;
-    virtual bool        is_dense (void) const;
-    virtual bool        is_expression_based (void) const {return storageType == _FORMULA_TYPE;}
-    virtual bool        is_numeric (void) const {return storageType == _NUMERICAL_TYPE;}
-    virtual bool        is_polynomial (void) const {return storageType == _POLYNOMIAL_TYPE;}
+    //_____________________________________________________________________________________________
+    
+    
+
+    inline bool        is_empty (void) const {return GetVDim () == 0UL || GetHDim () == 0UL;}
+    inline bool        is_row (void) const { return GetHDim() == 1UL;}
+    inline bool        is_column (void) const { return GetVDim() == 1UL;}
+    inline bool        is_square (void) const { return GetVDim() == GetHDim();}
+    inline bool        is_dense (void) const {return theIndex == nil;}
+    inline bool        is_expression_based (void) const {return storageType == _FORMULA_TYPE;}
+    inline bool        is_numeric (void) const {return storageType == _NUMERICAL_TYPE;}
+    inline bool        is_polynomial (void) const {return storageType == _POLYNOMIAL_TYPE;}
 
     HBLObjectRef           Evaluate (bool replace = true); // evaluates the matrix if contains formulas
     // if replace is true, overwrites the original
@@ -262,7 +308,7 @@ public:
 // square the matrix by Strassen's Multiplication
 
 
-    _Matrix*    Exponentiate (void);                // exponent of a matrix
+    _Matrix*    Exponentiate (hyFloat scale_to = 1.0, bool check_transition = false);                // exponent of a matrix
     void        Transpose (void);                   // transpose a matrix
     _Matrix     Gauss   (void);                     // Gaussian Triangularization process
     HBLObjectRef   LUDecompose (void) const;
@@ -422,6 +468,7 @@ public:
      */
 
 
+    bool        IsValidTransitionMatrix     () const;
 
     bool        IsReversible                (_Matrix* = nil);
     // check if the matrix is reversible
@@ -456,13 +503,13 @@ public:
     
     template <typename CALLBACK, typename EXTRACTOR>  void ForEach (CALLBACK&& cbv, EXTRACTOR&& accessor) const {
         if (theIndex) {
-            for (unsigned long i=0UL; i<lDim; i++) {
+            for (unsigned long i=0UL; i<(unsigned long)lDim; i++) {
                 if (theIndex[i] >= 0L) {
                     cbv (accessor (i), theIndex[i], i);
                 }
             }
         } else {
-            for (unsigned long i=0UL; i<lDim; i++) {
+            for (unsigned long i=0UL; i<(unsigned long)lDim; i++) {
                 cbv (accessor (i), i, i);
             }
         }
@@ -470,7 +517,7 @@ public:
 
     template <typename CALLBACK> void ForEachCellNumeric (CALLBACK&& cbv) const {
         if (theIndex) {
-            for (unsigned long i=0UL; i<lDim; i++) {
+            for (unsigned long i=0UL; i<(unsigned long)lDim; i++) {
                 long idx = theIndex[i];
                 if (idx >= 0L) {
                     long row = idx / vDim;
@@ -478,8 +525,8 @@ public:
                 }
             }
         } else {
-            for (unsigned long i=0UL, c = 0UL; i<hDim; i++) {
-                for (unsigned long j=0UL; j<vDim; j++, c++) {
+            for (unsigned long i=0UL, c = 0UL; i<(unsigned long)hDim; i++) {
+                for (unsigned long j=0UL; j<(unsigned long)vDim; j++, c++) {
                     cbv (theData[c], c, i, j);
                 }
             }
@@ -488,7 +535,7 @@ public:
 
     template <typename CALLBACK, typename EXTRACTOR>  bool Any (CALLBACK&& cbv, EXTRACTOR&& accessor) const {
         if (theIndex) {
-            for (unsigned long i=0UL; i<lDim; i++) {
+            for (unsigned long i=0UL; i<(unsigned long)lDim; i++) {
                 if (theIndex[i] >= 0L) {
                     if (cbv (accessor (i), theIndex[i])) {
                         return true;
@@ -496,7 +543,7 @@ public:
                 }
             }
         } else {
-            for (unsigned long i=0UL; i<lDim; i++) {
+            for (unsigned long i=0UL; i<(unsigned long)lDim; i++) {
                 if (cbv (accessor (i), i)) {
                     return true;
                 }
@@ -549,18 +596,10 @@ public:
      */
     /*---------------------------------------------------*/
 
-    hyFloat   *theData;                            // matrix elements
     static void    CreateMatrix    (_Matrix* theMatrix, long theHDim, long theVDim,  bool sparse = false, bool allocateStorage = false, bool isFla = false);
 
 
-protected:
 
-    // data
-
-    long        hDim, vDim, lDim;               // matrix physical dimensions; lDim - length of
-    // actual storage allocated
-
-    long*       theIndex;                       // indices of matrix elements in logical storage
 
 private:
 
@@ -646,30 +685,6 @@ private:
 
     // if nil - matrix stored conventionally
 
-    static      int     storageIncrement,       // how many percent of full matrix size
-                // to allocate to the matrix storage per increment
-
-                precisionArg,                    // how many elements in exp series to truncate after
-
-                switchThreshold;                 // maximum percentage of non-zero elements
-    // to keep the matrix sparse
-
-    static      hyFloat truncPrecision;
-
-    // matrix exp truncation precision
-
-    long        storageType,                    // true element matrix(1) or a matrix of pointers(0) which do not need to be deleted
-                // 2, if elements of the matrix are actually formulas which must be initialized to numerics before use
-                // matrices of type two are merely storage tables and can not be operated on directly, i.e their
-                // numerical values are computed first
-                bufferPerRow,                   // values reflecting internal storage structure for
-                overflowBuffer,                 // sparse matrices
-                allocationBlock;
-
-    _CompiledMatrixData*
-    cmd;
-
-    HBLObjectRef   theValue;                       // stores evaluated values of the matrix
 };
 
 /*__________________________________________________________________________________________________________________________________________ */
@@ -684,7 +699,7 @@ extern  long  ANALYTIC_COMPUTATION_FLAG;
 
 #ifdef  _SLKP_USE_AVX_INTRINSICS
     inline const double _avx_sum_4 (__m256d const & x) {
-      __m256d t = _mm256_add_pd (_mm256_shuffle_pd (x, x, 0x0),
+      /*__m256d t = _mm256_add_pd (_mm256_shuffle_pd (x, x, 0x0),
                                  // (x3,x3,x1,x1)
                                  _mm256_shuffle_pd (x, x, 0xf)
                                  // (x2,x2,x0,x0);
@@ -693,6 +708,12 @@ extern  long  ANALYTIC_COMPUTATION_FLAG;
                                        _mm256_castpd256_pd128 (t), // (x3+x2,x3+x2)
                                        _mm256_extractf128_pd(t,1)  // (x1+x0,x0+x1);
                                        ));
+       */
+        __m256d sum      = _mm256_hadd_pd(x, x);
+        return _mm_cvtsd_f64(_mm_add_pd(_mm256_extractf128_pd(sum, 1), _mm256_castpd256_pd128(sum)));
+        /*double  __attribute__ ((aligned (32))) array[4];
+        _mm256_store_pd (array, x);
+        return (array[0]+array[1])+(array[2]+array[3])  ;*/
       
     }
 #endif

@@ -690,37 +690,72 @@ lfunction estimators.FitLF(data_filter, tree, model_map, initial_values, model_o
 
     if (Type(initial_values) == "AssociativeList") {
         utility.ToggleEnvVariable("USE_LAST_RESULTS", 1);
-            df = estimators.ApplyExistingEstimates("`&likelihoodFunction`", model_objects, initial_values, run_options[utility.getGlobalValue("terms.run_options.proportional_branch_length_scaler")]);
+        df = estimators.ApplyExistingEstimates("`&likelihoodFunction`", model_objects, initial_values, run_options[utility.getGlobalValue("terms.run_options.proportional_branch_length_scaler")]);
     }
 
     if (utility.Has (run_options,utility.getGlobalValue("terms.run_options.apply_user_constraints"),"String")) {
         df += Call (run_options[utility.getGlobalValue("terms.run_options.apply_user_constraints")], lf_id, lf_components, data_filter, tree, model_map, initial_values, model_objects);
     }
 
+    can_do_restarts = null;
+
     if (utility.Has (run_options, utility.getGlobalValue("terms.search_grid"),"AssociativeList")) {
         grid_results = mpi.ComputeOnGrid (&likelihoodFunction, run_options [utility.getGlobalValue("terms.search_grid")], "mpi.ComputeOnGrid.SimpleEvaluator", "mpi.ComputeOnGrid.ResultHandler");
-        best_value   = Max (grid_results, 1);
-        parameters.SetValues ((run_options [utility.getGlobalValue("terms.search_grid")])[best_value["key"]]);
+        if (utility.Has (run_options, utility.getGlobalValue("terms.search_restarts"),"Number")) {
+            restarts = run_options[utility.getGlobalValue("terms.search_restarts")];
+            if (restarts > 1) {
+                grid_results    = utility.DictToSortedArray (grid_results);
+                can_do_restarts = {};
+                for (i = 1; i <= restarts; i += 1) {
+                    can_do_restarts + (run_options [utility.getGlobalValue("terms.search_grid")])[grid_results[Rows(grid_results)-i][1]];
+                }
+            }
+        }
+        if (null == can_do_restarts) {
+            best_value   = Max (grid_results, 1);
+            parameters.SetValues ((run_options [utility.getGlobalValue("terms.search_grid")])[best_value["key"]]);
+        }
         //console.log (best_value);
         //console.log ((run_options [utility.getGlobalValue("terms.search_grid")])[best_value["key"]]);
         //assert (0);
     }
-    
-    
-    //utility.SetEnvVariable ("VERBOSITY_LEVEL" ,10);
 
-   	Optimize (mles, likelihoodFunction);
 
-    //Export (lf,likelihoodFunction);
-    //console.log (lf);
+    if (Type (can_do_restarts) == "AssociativeList") {
+        //utility.SetEnvVariable ("VERBOSITY_LEVEL", 10);
+        bestlog    = -1e100;
+        for (i = 0; i < Abs (can_do_restarts); i += 1) {
+            parameters.SetValues (can_do_restarts[i]);
+            if (utility.Has (run_options,utility.getGlobalValue("terms.run_options.optimization_settings"),"AssociativeList")) {
+                Optimize (mles, likelihoodFunction, run_options[utility.getGlobalValue("terms.run_options.optimization_settings")]);
+            } else {
+                Optimize (mles, likelihoodFunction);
+            }
+            if (mles[1][0] > bestlog) {
+
+                //console.log ("\n\n**BEST LOG**\n\n");
+                bestlog = mles[1][0];
+                results = estimators.ExtractMLEs( & likelihoodFunction, model_objects);
+                results[utility.getGlobalValue ("terms.fit.log_likelihood")] = mles[1][0];
+            }
+        }
+    } else {
+        if (utility.Has (run_options,utility.getGlobalValue("terms.run_options.optimization_settings"),"AssociativeList")) {
+            Optimize (mles, likelihoodFunction, run_options[utility.getGlobalValue("terms.run_options.optimization_settings")]);
+        } else {
+            Optimize (mles, likelihoodFunction);
+        }
+        results = estimators.ExtractMLEs( & likelihoodFunction, model_objects);
+        results[utility.getGlobalValue ("terms.fit.log_likelihood")] = mles[1][0];
+    }
+
+
 
     if (Type(initial_values) == "AssociativeList") {
         utility.ToggleEnvVariable("USE_LAST_RESULTS", None);
     }
 
-    results = estimators.ExtractMLEs( & likelihoodFunction, model_objects);
 
-    results[utility.getGlobalValue ("terms.fit.log_likelihood")] = mles[1][0];
     results[utility.getGlobalValue ("terms.parameters")] = mles[1][1] + df;
 
     results[utility.getGlobalValue ("terms.fit.filters")] = {
@@ -825,12 +860,12 @@ lfunction estimators.FitSingleModel_Ext (data_filter, tree, model_template, init
 
     df = estimators.CreateLFObject (this_namespace, data_filter, tree, model_template, initial_values, run_options, None);
 
+    if (utility.Has (run_options,utility.getGlobalValue("terms.run_options.optimization_settings"),"AssociativeList")) {
+        Optimize (mles, likelihoodFunction, run_options[utility.getGlobalValue("terms.run_options.optimization_settings")]);
+    } else {
+    	Optimize (mles, likelihoodFunction);
+    }
 
-    
-    //Export (lfe, likelihoodFunction);
-    //fprintf ("/tmp/pogo-dump.fit", CLEAR_FILE, lfe);
-    
-   	Optimize(mles, likelihoodFunction);
 
     if (Type(initial_values) == "AssociativeList") {
         utility.ToggleEnvVariable("USE_LAST_RESULTS", None);
@@ -902,21 +937,20 @@ function estimators.FitMGREV.set_partition_omega(key, value) {
  * @param {String} key
  * @param {String} value
  */
-function estimators.FitMGREVExtractComponentBranchLengths(codon_data, fit_results) {
+lfunction estimators.FitMGREVExtractComponentBranchLengths(codon_data, fit_results) {
 
     //extract fitted trees with branch lengths scaled on synonymous and non-synonymous
     //substitutions per site
 
-    estimators.FitMGREVExtractComponentBranchLengths.stencils = genetic_code.ComputeBranchLengthStencils(codon_data[terms.code]);
+    stencils = genetic_code.ComputeBranchLengthStencils(codon_data[^"terms.code"]);
 
+    utility.SetEnvVariable ("BRANCH_LENGTH_STENCIL", stencils[^"terms.genetic_code.synonymous"]);
+    fit_results[^"terms.fit.synonymous_trees"] = (estimators.ExtractMLEs(fit_results[^"terms.likelihood_function"], fit_results[^"terms.model"]))[^"terms.fit.trees"];
 
-    BRANCH_LENGTH_STENCIL = estimators.FitMGREVExtractComponentBranchLengths.stencils["synonymous"];
-    fit_results["synonymous-trees"] = (estimators.ExtractMLEs(fit_results[terms.likelihood_function], fit_results[terms.model]))[terms.fit.trees];
+    utility.SetEnvVariable ("BRANCH_LENGTH_STENCIL", stencils[^"terms.genetic_code.nonsynonymous"]);
+     fit_results[^"terms.fit.nonsynonymous_trees"] = (estimators.ExtractMLEs(fit_results[^"terms.likelihood_function"], fit_results[^"terms.model"]))[^"terms.fit.trees"];
 
-    BRANCH_LENGTH_STENCIL = estimators.FitMGREVExtractComponentBranchLengths.stencils["non-synonymous"];
-    fit_results["non-synonymous-trees"] = (estimators.ExtractMLEs(fit_results[terms.likelihood_function], fit_results[terms.model]))[terms.fit.trees];
-
-    BRANCH_LENGTH_STENCIL = None;
+    utility.SetEnvVariable ("BRANCH_LENGTH_STENCIL", None);
 
     return fit_results;
 }
@@ -932,7 +966,6 @@ function estimators.FitMGREVExtractComponentBranchLengths(codon_data, fit_result
  * @returns MGREV results
  */
 lfunction estimators.FitCodonModel(codon_data, tree, generator, genetic_code, option, initial_values) {
-
 
 
 
@@ -1002,7 +1035,7 @@ lfunction estimators.FitCodonModel(codon_data, tree, generator, genetic_code, op
             Assumes that option["partitioned-omega"] is a dictionary where each partition has
             an entry (0-index based), which itself is a dictionary of the form: "branch-name" : "branch-set"
         */
-        utility.ForEach(option[utility.getGlobalValue("terms.run_options.partitioned_omega")], "_value_", "utility.AddToSet(`&partition_omega`,utility.Values(_value_))");
+        utility.ForEach(option[utility.getGlobalValue("terms.run_options.partitioned_omega")], "_value_", "utility.AddToSet(`&partition_omega`,utility.UniqueValues(_value_))");
     }
 
 
@@ -1051,17 +1084,18 @@ lfunction estimators.FitCodonModel(codon_data, tree, generator, genetic_code, op
 
     LikelihoodFunction likelihoodFunction = (lf_components);
 
+
     if (Type(initial_values) == "AssociativeList") {
         utility.ToggleEnvVariable("USE_LAST_RESULTS", 1);
         df += estimators.ApplyExistingEstimates("`&likelihoodFunction`", model_id_to_object, initial_values, option[utility.getGlobalValue("terms.run_options.proportional_branch_length_scaler")]);
     }
-    
+
     /*GetString (res, likelihoodFunction, -1);
-    
-    utility.ForEach (res[utility.getGlobalValue ('terms.parameters.local_independent')], '_value_', '  
+
+    utility.ForEach (res[utility.getGlobalValue ('terms.parameters.local_independent')], '_value_', '
         parameters.SetRange (_value_,terms.range_clamp_locals);
     ');*/
-    
+
 
 
     //Export (lfe, likelihoodFunction);
@@ -1075,11 +1109,14 @@ lfunction estimators.FitCodonModel(codon_data, tree, generator, genetic_code, op
 
     results = estimators.ExtractMLEs( & likelihoodFunction, model_id_to_object);
 
-    //console.log (mles);
 
     results[utility.getGlobalValue("terms.fit.log_likelihood")] = mles[1][0];
     results[utility.getGlobalValue("terms.parameters")] = mles[1][1] + (mg_rev [utility.getGlobalValue("terms.parameters")]) [utility.getGlobalValue("terms.model.empirical")] + df;
 
+
+    if (option[utility.getGlobalValue("terms.run_options.retain_model_object")]) {
+        results[utility.getGlobalValue("terms.model")] = model_id_to_object;
+    }
 
     if (option[utility.getGlobalValue("terms.run_options.retain_lf_object")]) {
         results[utility.getGlobalValue("terms.likelihood_function")] = & likelihoodFunction;
@@ -1145,18 +1182,18 @@ lfunction estimators.ComputeLF (id) {
  * @param {Dict} values : "parameter_id" -> {{initial values}} [row matrix], e.g.
     ...
         "busted.test.bsrel_mixture_aux_0":  {
-        {0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 0.9} 
+        {0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 0.9}
           },
          "busted.test.bsrel_mixture_aux_1":  {
-        {0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 0.9} 
+        {0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 0.9}
           }
     ...
 
  * @param {int} N how many points to sample
  * @param {Dict/null} init if not null, taken to be the initial template for variables
                       i.e. random draws will be one index change from this vector
- * @returns {Dict} like in 
- 
+ * @returns {Dict} like in
+
  {
  "0":{
    "busted.test.bsrel_mixture_aux_0":{
@@ -1192,10 +1229,10 @@ lfunction estimators.CreateInitialGrid (values, N, init) {
     }
 
     if (null != init) {
-        
-        toggle = Max (init[0], 0.5);
-        
-        for (i = 0; i < N; i+=1) { 
+
+        toggle = Min (init[0], 0.5);
+
+        for (i = 0; i < N; i+=1) {
             entry = {};
             for (v = 0; v < var_count; v += 1) {
                 if (Random (0,1) < toggle) {
@@ -1208,15 +1245,15 @@ lfunction estimators.CreateInitialGrid (values, N, init) {
                         ^"terms.id" : var_names[v],
                         ^"terms.fit.MLE" : (values[var_names[v]])[init[var_names[v]]]
                     };
-                
+
                 }
             }
             result + entry;
         }
     } else {
-    
-   
-        for (i = 0; i < N; i+=1) { 
+
+
+        for (i = 0; i < N; i+=1) {
             entry = {};
             for (v = 0; v < var_count; v += 1) {
                 entry [var_names[v]] = {
@@ -1228,7 +1265,53 @@ lfunction estimators.CreateInitialGrid (values, N, init) {
         }
     }
 
-	
+
+    return result;
+}
+
+
+/**
+  * @name estimators.LHC
+  * @description prepare a Dict object suitable for seeding initial LF values
+    based on Latin Hypercube Sampling
+  * @param {Dict} ranges : "parameter_id" -> range, i.e. {
+        lower_bound: 0,
+        upper_bound: 1
+    }.
+
+  * @param {Number} samples : the # of samples to draw
+
+*/
+
+lfunction estimators.LHC (ranges, samples) {
+
+
+	result = {};
+	var_count    = utility.Array1D (ranges);
+	var_names    = utility.Keys (ranges);
+	var_def      = {var_count,2};
+	var_samplers = {};
+
+	for (v = 0; v < var_count; v += 1) {
+	    var_def [v][0] = (ranges[var_names[v]])[^"terms.lower_bound"];
+	    var_def [v][1] = ((ranges[var_names[v]])[^"terms.upper_bound"] - var_def [v][0]) / (samples-1);
+	    var_samplers[v] = Random ({1,samples}["_MATRIX_ELEMENT_COLUMN_"], 0);
+    }
+
+
+    result = {};
+
+    for (i = 0; i < samples; i+=1) {
+        entry = {};
+        for (v = 0; v < var_count; v += 1) {
+            entry [var_names[v]] = {
+                ^"terms.id" : var_names[v],
+                ^"terms.fit.MLE" : var_def[v][0] + (var_samplers[v])[i] * var_def[v][1]
+            };
+        }
+        result + entry;
+    }
+
     return result;
 }
 
