@@ -145,27 +145,24 @@ function pogofit.fitGTR_fixalpha (current_results) {
 
     // Trees as dictionary for compatibility with rest of the output.
     pogofit.rev_mle[terms.fit.trees] = utility.SwapKeysAndValues(utility.MatrixToDict(pogofit.rev_mle[terms.fit.trees]));
-    
+
             
-    //final_ci    = {};
+    // Add 95% CI (LB and UB keys) to result 
     pogofit.lf_id = pogofit.rev_mle[terms.likelihood_function];
-    console.log(pogofit.lf_id);
     for (l1 = 0; l1 < 20; l1 += 1) {
         for (l2 = l1 + 1; l2 < 20; l2 += 1) {
+
             pogofit.rate_term = terms.aminoacidRate ((^"models.protein.alphabet")[l1],(^"models.protein.alphabet")[l2]);
             pogofit.parameter_name = ((pogofit.rev_mle[^"terms.global"])[pogofit.rate_term])[^"terms.id"];
-            console.log(pogofit.rate_term );
-            console.log(pogofit.parameter_name);
-            //if (utility.Has ((pogofit.mle[^"terms.global"])[pogofit.rate_term], ^"terms.constraint", "String")) {
-            //  // console.log ((^"models.protein.alphabet")[l1] + "--" + (^"models.protein.alphabet")[l2] + ": Constrained");
-            //   ((pogofit.rev_mle[^"terms.global"])[pogofit.rate_term])["CI"] = "NA";              
-            //   
-            //} else {
+
+            if (utility.Has ((pogofit.rev_mle[^"terms.global"])[pogofit.rate_term], ^"terms.constraint", "String")) {
+                ((pogofit.rev_mle[^"terms.global"])[pogofit.rate_term])[^"terms.lower_bound"] = "NA";             
+                ((pogofit.rev_mle[^"terms.global"])[pogofit.rate_term])[^"terms.upper_bound"] = "NA";                 
+            } else {
                 pogofit.ci = parameters.GetProfileCI (pogofit.parameter_name, pogofit.lf_id, 0.95);
-                console.log(pogofit.ci);
                 ((pogofit.rev_mle[^"terms.global"])[pogofit.rate_term])[^"terms.lower_bound"] = pogofit.ci[^"terms.lower_bound"];              
                 ((pogofit.rev_mle[^"terms.global"])[pogofit.rate_term])[^"terms.upper_bound"] = pogofit.ci[^"terms.upper_bound"];        
-            //}
+            }
         }
     }
     

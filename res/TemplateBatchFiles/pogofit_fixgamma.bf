@@ -20,7 +20,7 @@ LoadFunctionLibrary("pogofit_helper_fixgamma.bf"); // Functions, model definitio
 
 /*------------------------------------------------------------------------------*/
 
-utility.ToggleEnvVariable ("OPTIMIZATION_TIME_HARD_LIMIT", 3);
+//utility.ToggleEnvVariable ("OPTIMIZATION_TIME_HARD_LIMIT", 5);
 
 utility.ToggleEnvVariable ("NORMALIZE_SEQUENCE_NAMES", 1);
 
@@ -220,8 +220,7 @@ pogofit.startTimer (pogofit.timers, pogofit.final_phase);
 //pogofit.baseline_fit = utility.Map (utility.Filter (pogofit.analysis_results, "_value_", "_value_/'" + pogofit.baseline_phase + "'"), "_value_", "_value_['" + pogofit.baseline_phase + "']");
 
 pogofit.gtr_fit = pogofit.fitGTR_fixalpha(pogofit.baseline_fit);
-console.log("!!!!!!!?????????!!!!");
-exit();                                                                                                          
+                                                                                                         
 pogofit.stopTimer (pogofit.timers, pogofit.final_phase);
 /*************************************************************************************************************/
 /*************************************************************************************************************/
@@ -259,29 +258,29 @@ else  {
     pogofit.final_rij = pogofit.extract_rates();
 }
 
-io.ReportProgressMessageMD ("Protein GTR Fitter", "Confidence intervals", "Computing confidence intervals for individual rate parameters");
-
-namespace pogofit {
-    final_ci    = {};
-    lf_id = gtr_fit[^"terms.likelihood_function"];
-    for (l1 = 0; l1 < 20; l1 += 1) {
-        for (l2 = l1 + 1; l2 < 20; l2 += 1) {
-            rate_term = terms.aminoacidRate ((^"models.protein.alphabet")[l1],(^"models.protein.alphabet")[l2]);
-            parameter_name = ((gtr_fit[^"terms.global"])[rate_term])[^"terms.id"];
-            if (utility.Has ((gtr_fit[^"terms.global"])[rate_term], ^"terms.constraint", "String")) {
-               console.log ((^"models.protein.alphabet")[l1] + "--" + (^"models.protein.alphabet")[l2] + ": Constrained");
-            } else {
-                ci = parameters.GetProfileCI (parameter_name, lf_id, 0.95);
-                
-                console.log ((^"models.protein.alphabet")[l1] + "--" + (^"models.protein.alphabet")[l2] + ": " + Format (ci [^("terms.fit.MLE")], 8, 4) + " [" + Format (ci [^("terms.lower_bound")],8,4) + ", " + Format (ci [^("terms.upper_bound")],8,4) + "]");
-                
-                ci["From"] = (^"models.protein.alphabet")[l1];
-                ci["To"] = (^"models.protein.alphabet")[l2];
-                final_ci [rate_term] = ci;
-            }
-        }
-    }
-}
+// io.ReportProgressMessageMD ("Protein GTR Fitter", "Confidence intervals", "Computing confidence intervals for individual rate parameters");
+// 
+// namespace pogofit {
+//     final_ci    = {};
+//     lf_id = gtr_fit[^"terms.likelihood_function"];
+//     for (l1 = 0; l1 < 20; l1 += 1) {
+//         for (l2 = l1 + 1; l2 < 20; l2 += 1) {
+//             rate_term = terms.aminoacidRate ((^"models.protein.alphabet")[l1],(^"models.protein.alphabet")[l2]);
+//             parameter_name = ((gtr_fit[^"terms.global"])[rate_term])[^"terms.id"];
+//             if (utility.Has ((gtr_fit[^"terms.global"])[rate_term], ^"terms.constraint", "String")) {
+//                console.log ((^"models.protein.alphabet")[l1] + "--" + (^"models.protein.alphabet")[l2] + ": Constrained");
+//             } else {
+//                 ci = parameters.GetProfileCI (parameter_name, lf_id, 0.95);
+//                 
+//                 console.log ((^"models.protein.alphabet")[l1] + "--" + (^"models.protein.alphabet")[l2] + ": " + Format (ci [^("terms.fit.MLE")], 8, 4) + " [" + Format (ci [^("terms.lower_bound")],8,4) + ", " + Format (ci [^("terms.upper_bound")],8,4) + "]");
+//                 
+//                 ci["From"] = (^"models.protein.alphabet")[l1];
+//                 ci["To"] = (^"models.protein.alphabet")[l2];
+//                 final_ci [rate_term] = ci;
+//             }
+//         }
+//     }
+// }
 
 
 console.log("\n\n Saving results");
