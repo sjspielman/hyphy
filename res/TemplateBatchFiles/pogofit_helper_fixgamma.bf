@@ -1,96 +1,3 @@
-
-function pogofit.fitGTR_fixalpha (current_results) {
-
-    filter_info    = {};
-    trees = {};
-    initial_values = {terms.global : {}, terms.branch_length : {}};
-    index_to_file_name   = {};
-    for (file_index = 0; file_index < pogofit.file_list_count; file_index += 1) {
-        file_path = pogofit.file_list [file_index];
-        dataset_name = "pogofit.msa.part" + file_index;
-        data_info = alignments.ReadNucleotideDataSet (dataset_name, file_path);
-        data_info = alignments.EnsureMapping (dataset_name, data_info);
-
-        partition_specification = { "0" : {terms.data.name : "all", terms.data.filter_string : "", term.data.tree : ((current_results[file_index])[terms.fit.trees])[0]}};
-
-
-        this_bl = (current_results[terms.branch_length])[file_index];
-        this_tree = (current_results[terms.fit.trees])[file_index];
-
-        filter_info [file_index] = (alignments.DefineFiltersForPartitions (partition_specification,
-                                                                            dataset_name ,
-                                                                            dataset_name,
-                                                                            data_info))[0];
-        trees [file_index] = {terms.trees.newick :  this_tree};
-        (initial_values[terms.branch_length])[file_index] = this_bl;
-    }
-    filter_names = utility.Map (filter_info, "_value_", "_value_[terms.data.name]");
-
-    utility.SetEnvVariable ("VERBOSITY_LEVEL", 1);
-    utility.ToggleEnvVariable ("AUTO_PARALLELIZE_OPTIMIZE", 1);
-    
-    // run options including fix branch lengths
-    fit_options = {
-        terms.run_options.proportional_branch_length_scaler: {
-        },
-        terms.run_options.optimization_settings : 
-        {
-            "OPTIMIZATION_METHOD" : "coordinate-wise",
-            "OPTIMIZATION_PRECISION" : pogofit.precision
-        },
-        terms.run_options.retain_lf_object : TRUE
-    };
-    //(fit_options[terms.run_options.proportional_branch_length_scaler])[0] = terms.model.branch_length_constrain;
-
-    
-    // set intial values to user chosen matrix (same as baseline)
-    for (l1 = 0; l1 < 20; l1 += 1) {
-        for (l2 = l1 + 1; l2 < 20; l2 += 1) {
-            rate_term = terms.aminoacidRate (models.protein.alphabet[l1],models.protein.alphabet[l2]);
-            (initial_values[terms.global]) [rate_term] = {terms.fit.MLE : (pogofit.initial_rates[models.protein.alphabet[l1]])[models.protein.alphabet[l2]]}; 
-        }
-    }
-    // TODO: SOMETHING CHANGED WITH THE CODE REFACTOR??
-    alpha_term = "Gamma distribution shape parameter";
-    alpha = ((current_results[terms.global])[alpha_term])[terms.fit.MLE];
-    (initial_values[terms.global]) [alpha_term] = {terms.fit.MLE : alpha , terms.fix : TRUE};
-
-    
-    pogofit.rev_mle = estimators.FitSingleModel_Ext (
-                                        filter_names,
-                                        trees,
-                                        pogofit.rev_model,
-                                        initial_values,
-                                        fit_options
-                                   );                         
-
-                  
-
-    /*   
-    // Uncomment these lines if you'd like to save the NEXUS LF.                        
-    lf_id = pogofit.rev.mle[terms.likelihood_function];
-    Export(pogofit.finalphase_LF, ^lf_id);
-    fprintf(pogofit.final_likelihood_function, pogofit.finalphase_LF);
-    */
-    
-    // Save the rev.mle into the analysis_results, and cache it.
-    (^"pogofit.analysis_results")[pogofit.final_phase] = pogofit.rev_mle;
-
-    console.log (""); // clear past the optimization progress line
-    utility.SetEnvVariable ("VERBOSITY_LEVEL", 0);
-    utility.ToggleEnvVariable ("AUTO_PARALLELIZE_OPTIMIZE", None);
-    utility.ToggleEnvVariable ("OPTIMIZATION_METHOD", None);
-
-
-    // Trees as dictionary for compatibility with rest of the output.
-    pogofit.rev_mle[terms.fit.trees] = utility.SwapKeysAndValues(utility.MatrixToDict(pogofit.rev_mle[terms.fit.trees]));
-    
-    return pogofit.rev_mle;
-
-}
-
-
-
 function pogofit.fitBaselineTogether () {
 
 
@@ -153,6 +60,123 @@ function pogofit.fitBaselineTogether () {
     return pogofit.baseline_mle;
 
 }
+
+
+function pogofit.fitGTR_fixalpha (current_results) {
+
+    filter_info    = {};
+    trees = {};
+    initial_values = {terms.global : {}, terms.branch_length : {}};
+    index_to_file_name   = {};
+    for (file_index = 0; file_index < pogofit.file_list_count; file_index += 1) {
+        file_path = pogofit.file_list [file_index];
+        dataset_name = "pogofit.msa.part" + file_index;
+        data_info = alignments.ReadNucleotideDataSet (dataset_name, file_path);
+        data_info = alignments.EnsureMapping (dataset_name, data_info);
+
+        partition_specification = { "0" : {terms.data.name : "all", terms.data.filter_string : "", term.data.tree : ((current_results[file_index])[terms.fit.trees])[0]}};
+
+
+        this_bl = (current_results[terms.branch_length])[file_index];
+        this_tree = (current_results[terms.fit.trees])[file_index];
+
+        filter_info [file_index] = (alignments.DefineFiltersForPartitions (partition_specification,
+                                                                            dataset_name ,
+                                                                            dataset_name,
+                                                                            data_info))[0];
+        trees [file_index] = {terms.trees.newick :  this_tree};
+        (initial_values[terms.branch_length])[file_index] = this_bl;
+    }
+    filter_names = utility.Map (filter_info, "_value_", "_value_[terms.data.name]");
+
+    utility.SetEnvVariable ("VERBOSITY_LEVEL", 1);
+    utility.ToggleEnvVariable ("AUTO_PARALLELIZE_OPTIMIZE", 1);
+    
+    // run options including fix branch lengths
+    fit_options = {
+        terms.run_options.proportional_branch_length_scaler: {
+        },
+        terms.run_options.optimization_settings : 
+        {
+            "OPTIMIZATION_METHOD" : "coordinate-wise",
+            "OPTIMIZATION_PRECISION" : pogofit.precision
+        },
+        terms.run_options.retain_lf_object : TRUE
+    };
+    //(fit_options[terms.run_options.proportional_branch_length_scaler])[0] = terms.model.branch_length_constrain;
+
+    
+    // set intial values to user chosen matrix (same as baseline)
+    for (l1 = 0; l1 < 20; l1 += 1) {
+        for (l2 = l1 + 1; l2 < 20; l2 += 1) {
+            rate_term = terms.aminoacidRate (models.protein.alphabet[l1],models.protein.alphabet[l2]);
+            (initial_values[terms.global]) [rate_term] = {terms.fit.MLE : (pogofit.initial_rates[models.protein.alphabet[l1]])[models.protein.alphabet[l2]]}; 
+        }
+    }
+    alpha = ((current_results[terms.global])[terms.rate_variation.gamma_alpha])[terms.fit.MLE];
+    (initial_values[terms.global]) [alpha_term] = {terms.fit.MLE : alpha , terms.fix : TRUE};
+
+    
+    pogofit.rev_mle = estimators.FitSingleModel_Ext (
+                                        filter_names,
+                                        trees,
+                                        pogofit.rev_model,
+                                        initial_values,
+                                        fit_options
+                                   );                         
+
+                  
+
+    /*   
+    // Uncomment these lines if you'd like to save the NEXUS LF.                        
+    lf_id = pogofit.rev.mle[terms.likelihood_function];
+    Export(pogofit.finalphase_LF, ^lf_id);
+    fprintf(pogofit.final_likelihood_function, pogofit.finalphase_LF);
+    */
+    
+    // Save the rev.mle into the analysis_results, and cache it.
+    (^"pogofit.analysis_results")[pogofit.final_phase] = pogofit.rev_mle;
+
+    console.log (""); // clear past the optimization progress line
+    utility.SetEnvVariable ("VERBOSITY_LEVEL", 0);
+    utility.ToggleEnvVariable ("AUTO_PARALLELIZE_OPTIMIZE", None);
+    utility.ToggleEnvVariable ("OPTIMIZATION_METHOD", None);
+
+
+    // Trees as dictionary for compatibility with rest of the output.
+    pogofit.rev_mle[terms.fit.trees] = utility.SwapKeysAndValues(utility.MatrixToDict(pogofit.rev_mle[terms.fit.trees]));
+    
+            
+    //final_ci    = {};
+    pogofit.lf_id = pogofit.rev_mle[terms.likelihood_function];
+    console.log(pogofit.lf_id);
+    for (l1 = 0; l1 < 20; l1 += 1) {
+        for (l2 = l1 + 1; l2 < 20; l2 += 1) {
+            pogofit.rate_term = terms.aminoacidRate ((^"models.protein.alphabet")[l1],(^"models.protein.alphabet")[l2]);
+            pogofit.parameter_name = ((pogofit.rev_mle[^"terms.global"])[pogofit.rate_term])[^"terms.id"];
+            console.log(pogofit.rate_term );
+            console.log(pogofit.parameter_name);
+            //if (utility.Has ((pogofit.mle[^"terms.global"])[pogofit.rate_term], ^"terms.constraint", "String")) {
+            //  // console.log ((^"models.protein.alphabet")[l1] + "--" + (^"models.protein.alphabet")[l2] + ": Constrained");
+            //   ((pogofit.rev_mle[^"terms.global"])[pogofit.rate_term])["CI"] = "NA";              
+            //   
+            //} else {
+                pogofit.ci = parameters.GetProfileCI (pogofit.parameter_name, pogofit.lf_id, 0.95);
+                console.log(pogofit.ci);
+                ((pogofit.rev_mle[^"terms.global"])[pogofit.rate_term])[^"terms.lower_bound"] = pogofit.ci[^"terms.lower_bound"];              
+                ((pogofit.rev_mle[^"terms.global"])[pogofit.rate_term])[^"terms.upper_bound"] = pogofit.ci[^"terms.upper_bound"];        
+            //}
+        }
+    }
+    
+    
+    return pogofit.rev_mle;
+
+}
+
+
+
+
 
 
 
@@ -327,170 +351,6 @@ function pogofit.handle_baseline_callback (node, result, arguments) {
                                 "Received file '" + arguments[0] + "' from node " + node + ". LogL = " + result[terms.fit.log_likelihood]);
 }
 
-
-
-
-
-function pogofit.fitGTR_gamma (current_bl, current_gtr, phase) {
-
-    //file_list = utility.Keys (current_results); ---> pogofit.file_list
-    //file_count = utility.Array1D (file_list);   ---> pogofit.file_list_count
-    // NOTE: pogofit.index_to_filename is {filename:0, filename:1}
-
-    partition_info = {};
-    filter_info    = {};
-    trees = {};
-    initial_values = {terms.global : {}, terms.branch_length : {}};
-    index_to_file_name   = {};
-
-
-
-    for (file_index = 0; file_index < pogofit.file_list_count; file_index += 1) {
-        file_path = pogofit.file_list [file_index];
-        dataset_name = "pogofit.msa.part" + file_index;
-        partition_info [file_index] = alignments.ReadNucleotideDataSet (dataset_name, file_path);
-        partition_specification = { "0" : {terms.data.name : "all", terms.data.filter_string : "", terms.data.tree : ((current_bl[file_index])[terms.fit.trees])[0]}};
-
-        filter_info [file_index] = (alignments.DefineFiltersForPartitions (partition_specification,
-                                                                            dataset_name ,
-                                                                            dataset_name,
-                                                                            partition_info [file_index]))[0];
-        trees [file_index] = {terms.trees.newick :  ((current_bl[file_index])[terms.fit.trees])[0]};
-        (initial_values[terms.branch_length])[file_index] = ((current_bl[file_index])[terms.branch_length])[0];
-    }
-    initial_values[terms.global] = current_gtr[terms.global];
-
-
-
-    utility.SetEnvVariable    ("VERBOSITY_LEVEL", 1);
-    utility.ToggleEnvVariable ("AUTO_PARALLELIZE_OPTIMIZE", 1);
- 
-
-   pogofit.rev_mle = estimators.FitSingleModel_Ext (
-                                       utility.Map (filter_info, "_value_", "_value_[terms.data.name]"),
-                                        trees,
-                                        pogofit.rev_model_gamma,
-                                        initial_values,
-                                       {terms.run_options.retain_lf_object : TRUE,
-                                       terms.run_options.optimization_settings : 
-                                            {
-                                                "OPTIMIZATION_METHOD" : "nedler-mead",
-                                                "MAXIMUM_OPTIMIZATION_ITERATIONS" : 500,
-                                                "OPTIMIZATION_PRECISION" : 1
-                                            }
-                                         }
-                                       );
-    /*   
-    // Uncomment these lines if you'd like to save the NEXUS LF.                        
-    lf_id = pogofit.rev.mle[terms.likelihood_function];
-    Export(pogofit.finalphase_LF, ^lf_id);
-    fprintf(pogofit.final_likelihood_function, pogofit.finalphase_LF);
-    */
-    pogofit.rev_mle - terms.likelihood_function;
-    
-    // Save the rev.mle into the analysis_results, and cache it.
-    (^"pogofit.analysis_results")[this_phase] = pogofit.rev_mle;
-
-    console.log (""); // clear past the optimization progress line
-    //utility.SetEnvVariable ("VERBOSITY_LEVEL", 0);
-    utility.ToggleEnvVariable ("AUTO_PARALLELIZE_OPTIMIZE", None);
-    utility.ToggleEnvVariable ("OPTIMIZATION_METHOD", None);
-
-
-    // Trees as dictionary for compatibility with rest of the output.
-    pogofit.rev_mle[terms.fit.trees] = utility.SwapKeysAndValues(utility.MatrixToDict(pogofit.rev_mle[terms.fit.trees]));
-    
-    return pogofit.rev_mle;
-
-}
-
-
-
-
-
-function pogofit.fitGTR_twophase(current_results, phase, isfinalphase) {
-
-    //file_list = utility.Keys (current_results); ---> pogofit.file_list
-    //file_count = utility.Array1D (file_list);   ---> pogofit.file_list_count
-    // NOTE: pogofit.index_to_filename is {filename:0, filename:1}
-
-    partition_info = {};
-    filter_info    = {};
-    trees = {};
-    initial_values = {terms.global : {}, terms.branch_length : {}};
-    proportional_scalers = {};
-    index_to_file_name   = {};
-
-    for (file_index = 0; file_index < pogofit.file_list_count; file_index += 1) {
-        file_path = pogofit.file_list [file_index];
-        dataset_name = "pogofit.msa.part" + file_index;
-        partition_info [file_index] = alignments.ReadNucleotideDataSet (dataset_name, file_path);
-        partition_specification = { "0" : {terms.data.name : "all", terms.data.filter_string : "", terms.data.tree : ((current_results[file_index])[terms.fit.trees])[0]}};
-
-
-        filter_info [file_index] = (alignments.DefineFiltersForPartitions (partition_specification,
-                                                                            dataset_name ,
-                                                                            dataset_name,
-                                                                            partition_info [file_index]))[0];
-        trees [file_index] = {terms.trees.newick :  ((current_results[file_index])[terms.fit.trees])[0]};
-        (initial_values[terms.branch_length])[file_index] = ((current_results[file_index])[terms.branch_length])[0];
-        if (phase == pogofit.prefinal_phase) {
-            scaler = "pogofit.gtr_scaler_" + file_index;
-            parameters.DeclareGlobalWithRanges (scaler, 1, 0, 1000);
-            proportional_scalers[file_index] = scaler;
-        }
-
-    
-    }
-
-    utility.SetEnvVariable ("VERBOSITY_LEVEL", 1);
-    utility.ToggleEnvVariable ("AUTO_PARALLELIZE_OPTIMIZE", 1);
-    utility.ToggleEnvVariable ("OPTIMIZATION_METHOD", 0);
-
-    if (phase == pogofit.prefinal_phase) {
-        // Set initial values 
-        for (l1 = 0; l1 < 20; l1 += 1) {
-            for (l2 = l1 + 1; l2 < 20; l2 += 1) {
-                (initial_values[terms.global]) [terms.aminoacidRate (models.protein.alphabet[l1],models.protein.alphabet[l2])] = {terms.fit.MLE : 0.1}; // set all to 1
-            }
-        }
-        // fit the model
-        pogofit.mle = estimators.FitSingleModel_Ext (
-                                            utility.Map (filter_info, "_value_", "_value_[terms.data.name]"),
-                                            trees,
-                                            pogofit.rev_model,
-                                            initial_values,
-                                            {terms.run_options.proportional_branch_length_scaler : proportional_scalers}
-                                       );
-
-    } else
-    {
-        // FINAL TUNING
-        pogofit.mle = estimators.FitSingleModel_Ext (
-                                            utility.Map (filter_info, "_value_", "_value_[terms.data.name]"),
-                                            trees,
-                                            pogofit.rev_model,
-                                            initial_values,
-                                             {terms.run_options.retain_lf_object : TRUE}
-                                       );
-    }
-
-                                      
-    // Save the rev.mle into the analysis_results, and cache it.
-    (^"pogofit.analysis_results")[phase] = pogofit.mle;
-
-    console.log (""); // clear past the optimization progress line
-    utility.SetEnvVariable ("VERBOSITY_LEVEL", 0);
-    utility.ToggleEnvVariable ("AUTO_PARALLELIZE_OPTIMIZE", None);
-    utility.ToggleEnvVariable ("OPTIMIZATION_METHOD", None);
-
-
-    // Trees as dictionary for compatibility with rest of the output.
-    pogofit.mle[terms.fit.trees] = utility.SwapKeysAndValues(utility.MatrixToDict(pogofit.mle[terms.fit.trees]));
-    
-    return pogofit.mle;
-
-}
 
 
 

@@ -20,7 +20,7 @@ LoadFunctionLibrary("pogofit_helper_fixgamma.bf"); // Functions, model definitio
 
 /*------------------------------------------------------------------------------*/
 
-//utility.ToggleEnvVariable ("OPTIMIZATION_TIME_HARD_LIMIT", 15);
+utility.ToggleEnvVariable ("OPTIMIZATION_TIME_HARD_LIMIT", 3);
 
 utility.ToggleEnvVariable ("NORMALIZE_SEQUENCE_NAMES", 1);
 
@@ -220,7 +220,8 @@ pogofit.startTimer (pogofit.timers, pogofit.final_phase);
 //pogofit.baseline_fit = utility.Map (utility.Filter (pogofit.analysis_results, "_value_", "_value_/'" + pogofit.baseline_phase + "'"), "_value_", "_value_['" + pogofit.baseline_phase + "']");
 
 pogofit.gtr_fit = pogofit.fitGTR_fixalpha(pogofit.baseline_fit);
-                                                                                                                              
+console.log("!!!!!!!?????????!!!!");
+exit();                                                                                                          
 pogofit.stopTimer (pogofit.timers, pogofit.final_phase);
 /*************************************************************************************************************/
 /*************************************************************************************************************/
